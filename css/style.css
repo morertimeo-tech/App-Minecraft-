@@ -202,6 +202,7 @@ h2.section {
   font: inherit; font-size: 12px; cursor: pointer;
 }
 .piece-tab canvas { width: 48px; height: 48px; image-rendering: pixelated; }
+.piece-tab small { font-size: 10px; line-height: 1.2; opacity: .8; text-align: center; }
 .piece-tab[aria-selected="true"] { border-color: var(--gold); color: var(--text); background: #2e2645; }
 
 .preview {

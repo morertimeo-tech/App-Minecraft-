@@ -143,6 +143,13 @@
   }
 
   // ---------- Trims ----------
+  function pieceLabel(id) {
+    const ps = state.trim.settings[id];
+    const mat = DATA.ARMOR_MATERIALS.find((m) => m.id === ps.material).name;
+    const pat = DATA.TRIM_PATTERNS.find((x) => x.id === ps.pattern).name;
+    return `${mat} · ${pat}`;
+  }
+
   function renderTrims() {
     const piece = state.trim.piece;
     const s = state.trim.settings[piece];
@@ -182,21 +189,8 @@
         ${DATA.ARMOR_PIECES.map((p) => `
           <button class="piece-tab" role="tab" data-action="trim-piece" data-v="${p.id}" aria-selected="${p.id === piece}">
             <canvas data-draw="${p.id}" width="16" height="16"></canvas>${esc(p.name)}
+            <small>${esc(pieceLabel(p.id))}</small>
           </button>`).join('')}
-      </div>
-
-      <div class="preview">
-        ${DATA.ARMOR_PIECES.map((p) => {
-          const ps = state.trim.settings[p.id];
-          const mat = DATA.ARMOR_MATERIALS.find((m) => m.id === ps.material).name;
-          const pat = DATA.TRIM_PATTERNS.find((x) => x.id === ps.pattern).name;
-          return `
-            <div class="preview-card">
-              <canvas data-preview="${p.id}" width="16" height="16"></canvas>
-              <small>${esc(p.name)}</small>
-              <small>${esc(mat)} · ${esc(pat)}</small>
-            </div>`;
-        }).join('')}
       </div>
 
       <section class="panel" style="margin-top:12px">
@@ -251,7 +245,6 @@
     const jobs = [];
     DATA.ARMOR_PIECES.forEach((p) => {
       jobs.push(draw(`[data-draw="${p.id}"]`, p.id));
-      jobs.push(draw(`[data-preview="${p.id}"]`, p.id));
     });
     try { await Promise.all(jobs.filter(Boolean)); }
     catch (e) { console.error(e); }
