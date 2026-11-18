@@ -4,7 +4,7 @@
 Usage : python3 -I tools/build_trades.py trades.json PACK_26_1_DIR OUT_REPO_DIR
   - traduit noms / niveaux / notes en français
   - résout une texture par objet dans le pack (items/ puis blocks/) et la copie dans
-    OUT_REPO_DIR/assets/trade-icons/<slug>.png
+    OUT_REPO_DIR/assets/item-icons/<slug>.png
 Les noms français sont écrits de mémoire (la source wiki est en anglais).
 """
 import json, os, re, shutil, sys
@@ -140,7 +140,7 @@ def fr_note(n):
     return None
 
 prof_in = json.load(open(trades_json, encoding='utf-8'))
-icons_dir = out + '/assets/trade-icons'
+icons_dir = out + '/assets/item-icons'
 os.makedirs(icons_dir, exist_ok=True)
 for f in os.listdir(icons_dir): os.remove(os.path.join(icons_dir, f))
 

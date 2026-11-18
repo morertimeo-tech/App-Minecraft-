@@ -6,7 +6,8 @@ Application web mobile (HTML/CSS/JS, sans build) avec :
 2. **Trims d'armure** : pour chaque pièce, choix de la matière (cuir, maille, cuivre, fer, or, diamant, netherite), couleur de teinture du cuir, motif et matière de trim (11 couleurs). Rendu avec les vraies textures du jeu, dont un **porte-armure 3D** (glisse pour tourner) qui montre les motifs de trim comme en jeu.
 
 3. **Minerais** : meilleur niveau Y et plage de génération de chaque minerai (Overworld et Nether).
-4. **Échanges** : tous les échanges des 13 professions de villageois et du colporteur (283 échanges, par niveau), avec recherche d'un objet dans toutes les professions.
+4. **Structures** : 23 structures (village, cité antique, bastion, cité de l'End…) avec biomes, commande `/locate` et butins possibles par coffre (929 lignes, chance de trouver chaque objet). La recherche répond aussi à « où trouver tel objet ».
+5. **Échanges** : tous les échanges des 13 professions de villageois et du colporteur (283 échanges, par niveau), avec recherche d'un objet dans toutes les professions.
 
 ## Lancer l'app
 
@@ -27,6 +28,7 @@ js/optimizer.js       calcul de l'ordre optimal (programmation dynamique)
 js/trims.js           composition des armures (teinture + recoloration du trim)
 js/stand.js           porte-armure 3D (three.js, dans vendor/)
 js/trades-data.js     échanges des villageois (généré, ne pas éditer à la main)
+js/structures-data.js structures et butins (généré)
 tools/                scripts qui extraient les échanges du wiki et génèrent js/trades-data.js
 js/app.js             interface
 assets/               textures copiées du jeu (Minecraft 26.1, via PrismarineJS/minecraft-assets)
@@ -57,7 +59,17 @@ python3 -I tools/extract_trades.py Trading.html trades.json
 python3 -I tools/build_trades.py trades.json <dossier assets 26.1> .
 ```
 
+### Structures et butins
+
+```bash
+# pages wiki : Structure, puis st/<Page>.html (Ancient_City, Trial_Chambers, …, Village_Loot, Cold_Ocean_Ruins…)
+python3 -I tools/extract_structures.py <dossier wiki> structures_raw.json
+python3 -I tools/build_structures.py structures_raw.json <dossier assets 26.1> .
+```
+
 ## Limites connues
+
+- **Structures** : seuls les butins de la version Java actuelle sont gardés ; le wiki indique aussi les versions à venir (ex. « Java 26.4 »), ignorées ici. Les biomes, descriptions et astuces sont rédigés à la main d'après le wiki. Les noms français (structures, objets, biomes) sont écrits de mémoire ; quelques objets récents n'ont pas d'icône (lit de paille, coussin, disque « Bounce »…).
 
 - **Échanges** : Java Edition. Le wiki liste parfois du contenu plus récent que mes textures (version 26.1) : bûche et pousse de peuplier, pointe de soufre, bannières, lit et bouclier n'ont pas d'icône (affichés « ? »). Les noms français des objets sont écrits de mémoire, surtout pour les nouveautés.
 - **Minerais** : le « meilleur niveau » est le pic théorique de la distribution ; les mesures réelles du wiki diffèrent parfois (ex. émeraude).

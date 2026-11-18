@@ -4,6 +4,7 @@
   const TRIMS = window.MC_TRIMS;
   const STAND = window.MC_STAND;
   const TRADES = window.MC_TRADES;
+  const STRUCTS = window.MC_STRUCTURES;
   const APP = document.getElementById('app');
   const ASSETS = 'assets';
   const STORE_KEY = 'enchantlab.trims.v1';
@@ -34,6 +35,7 @@
     result: null,    // résultat de l'optimiseur
     showOthers: false, // section « Autres enchantements » dépliée
     trade: { prof: null, q: '' }, // onglet Échanges : profession ouverte, recherche
+    struct: { id: null, q: '' },  // onglet Structures : structure ouverte, recherche
     trim: trimState,
   };
 
@@ -45,6 +47,11 @@
   function setTab(tab) {
     state.tab = tab;
     APP.addEventListener('input', (e) => {
+    if (e.target.id === 'struct-q') {
+      state.struct.q = e.target.value;
+      document.getElementById('struct-body').innerHTML = structureBody();
+      return;
+    }
     if (e.target.id !== 'trade-q') return;
     state.trade.q = e.target.value;
     document.getElementById('trade-body').innerHTML = tradeBody();
@@ -294,7 +301,7 @@
 
   function slot(it) {
     const img = it.icon
-      ? `<img class="px" src="${ASSETS}/trade-icons/${it.icon}.png" alt="" />`
+      ? `<img class="px" src="${ASSETS}/item-icons/${it.icon}.png" alt="" />`
       : '<span class="noicon">?</span>';
     return `<span class="slot${it.ench ? ' ench' : ''}" title="${esc(it.name)}">${img}${it.n !== '1' ? `<b class="cnt">${esc(it.n)}</b>` : ''}</span>`;
   }
@@ -336,7 +343,7 @@
       return `
         <button class="back" data-action="trade-back">← Professions</button>
         <div class="cat-head">
-          ${p.icon ? `<img class="px" src="${ASSETS}/trade-icons/${p.icon}.png" alt="" />` : ''}
+          ${p.icon ? `<img class="px" src="${ASSETS}/item-icons/${p.icon}.png" alt="" />` : ''}
           <div><h2>${esc(p.name)}</h2><p>${n} échanges</p></div>
         </div>
         ${p.levels.map(levelBlock).join('')}`;
@@ -345,7 +352,7 @@
       <div class="grid">
         ${TRADES.map((p) => `
           <button class="tile" data-action="trade-open" data-id="${p.id}">
-            ${p.icon ? `<img class="px" src="${ASSETS}/trade-icons/${p.icon}.png" alt="" />` : ''}
+            ${p.icon ? `<img class="px" src="${ASSETS}/item-icons/${p.icon}.png" alt="" />` : ''}
             <span>${esc(p.name)}</span>
             <small>${p.levels.reduce((a, l) => a + l.trades.length, 0)} échanges</small>
           </button>`).join('')}
@@ -357,6 +364,99 @@
     return `
       <input id="trade-q" class="search" type="search" inputmode="search" placeholder="Chercher un objet (diamant, livre…)" value="${esc(state.trade.q)}" autocomplete="off" />
       <div id="trade-body">${tradeBody()}</div>`;
+  }
+
+  // ---------- Structures ----------
+  const qtyText = (q) => q.replace(' / ', ' ou ');
+  const chanceNum = (c) => parseFloat(c.replace(',', '.'));
+  const sIcon = (icon) => (icon ? `<img class="px" src="${ASSETS}/item-icons/${icon}.png" alt="" />` : '<span class="noicon">?</span>');
+
+  function lootRow(r) {
+    const pct = Math.max(2, Math.min(100, chanceNum(r.chance)));
+    return `
+      <div class="loot">
+        <span class="slot">${sIcon(r.icon)}</span>
+        <div class="loot-main">
+          <div class="loot-top"><strong>${esc(r.name)}</strong><span class="loot-qty">${esc(qtyText(r.qty))}</span></div>
+          <div class="chance"><span style="width:${pct}%"></span><b>${esc(r.chance)}</b></div>
+          ${(r.notes || []).map((n) => `<p class="tnote">ℹ ${esc(n)}</p>`).join('')}
+        </div>
+      </div>`;
+  }
+
+  function structureDetail(st) {
+    const ids = st.locate;
+    const locate = ids.length
+      ? `<div class="cmd"><code>/locate structure minecraft:${esc(ids[0])}</code></div>
+         ${ids.length > 1 ? `<p class="hint">Autres identifiants : ${ids.slice(1).map((i) => `<code>${esc(i)}</code>`).join(' ')}</p>` : ''}`
+      : '<p class="hint">Pas de commande /locate pour cette structure.</p>';
+    return `
+      <button class="back" data-action="struct-back">← Structures</button>
+      <div class="cat-head">
+        <span class="bigicon">${sIcon(st.icon)}</span>
+        <div><h2>${esc(st.name)}</h2><p>${esc(st.dim)}</p></div>
+      </div>
+      <p class="sdesc">${esc(st.desc)}</p>
+      <section class="panel" style="margin-top:12px">
+        <div class="control-title">Où la trouver</div>
+        <div class="chips">${st.biomes.map((b) => `<span class="chip">${esc(b)}</span>`).join('')}</div>
+        <div class="control-title">Commande (Java)</div>
+        ${locate}
+        ${st.tips.length ? `<div class="control-title">Astuce</div>${st.tips.map((t) => `<p class="tnote" style="font-size:13px">💡 ${esc(t)}</p>`).join('')}` : ''}
+      </section>
+      <h2 class="section">Butins possibles</h2>
+      ${st.containers.length ? st.containers.map((c, i) => `
+        <details class="cont" ${st.containers.length === 1 || i === 0 ? 'open' : ''}>
+          <summary>${esc(c.name)} <small>${c.rows.length} objets</small></summary>
+          ${c.rows.map(lootRow).join('')}
+        </details>`).join('') : '<div class="notice warn">Cette structure n\'a pas de coffre de butin.</div>'}
+      <p class="disclaimer">« % » = chance de trouver l'objet au moins une fois dans ce coffre. Source : minecraft.wiki, Java Edition (version actuelle).</p>`;
+  }
+
+  function structureBody() {
+    const { id, q } = state.struct;
+    const nq = norm(q.trim());
+    if (nq) {
+      const byName = STRUCTS.filter((s) => norm(s.name).includes(nq));
+      const hits = [];
+      for (const s of STRUCTS) for (const c of s.containers) for (const r of c.rows) {
+        if (norm(r.name).includes(nq)) hits.push({ s, c, r });
+      }
+      hits.sort((a, b) => chanceNum(b.r.chance) - chanceNum(a.r.chance));
+      return `
+        ${byName.length ? `<h2 class="section">Structures</h2><div class="grid">${byName.map(structTile).join('')}</div>` : ''}
+        ${hits.length ? `<h2 class="section">Où trouver « ${esc(q.trim())} »</h2>
+          <p class="hint">${hits.length} résultat${hits.length > 1 ? 's' : ''}, du plus probable au moins probable</p>
+          ${hits.slice(0, 80).map((h) => `
+            <div class="trade">
+              <div class="loot-top"><strong>${esc(h.r.name)}</strong><span class="loot-qty">${esc(qtyText(h.r.qty))}</span></div>
+              <div class="chance"><span style="width:${Math.max(2, chanceNum(h.r.chance))}%"></span><b>${esc(h.r.chance)}</b></div>
+              <div class="tname"><button class="link" data-action="struct-open" data-id="${h.s.id}">${esc(h.s.name)}</button> <span>·</span> ${esc(h.c.name)}</div>
+            </div>`).join('')}
+          ${hits.length > 80 ? `<p class="hint">… et ${hits.length - 80} autres : précise ta recherche.</p>` : ''}` : ''}
+        ${!byName.length && !hits.length ? `<div class="notice warn">Rien ne correspond à « ${esc(q.trim())} ».</div>` : ''}`;
+    }
+    if (id) return structureDetail(STRUCTS.find((s) => s.id === id));
+    const dims = ['Overworld', 'Overworld et Nether', 'Nether', "L'End"];
+    return dims.map((d) => {
+      const list = STRUCTS.filter((s) => s.dim === d);
+      return list.length ? `<h2 class="section">${esc(d)}</h2><div class="grid">${list.map(structTile).join('')}</div>` : '';
+    }).join('') + `<p class="disclaimer">Source : minecraft.wiki (Java Edition). Les noms français sont à vérifier ; certains objets récents n'ont pas d'icône (?).</p>`;
+  }
+
+  function structTile(s) {
+    const n = s.containers.reduce((a, c) => a + c.rows.length, 0);
+    return `
+      <button class="tile" data-action="struct-open" data-id="${s.id}">
+        ${sIcon(s.icon)}<span>${esc(s.name)}</span>
+        <small>${s.containers.length ? s.containers.length + ' coffre' + (s.containers.length > 1 ? 's' : '') + ' · ' + n + ' objets' : 'sans coffre'}</small>
+      </button>`;
+  }
+
+  function renderStructures() {
+    return `
+      <input id="struct-q" class="search" type="search" inputmode="search" placeholder="Structure ou objet (disque, trident…)" value="${esc(state.struct.q)}" autocomplete="off" />
+      <div id="struct-body">${structureBody()}</div>`;
   }
 
   // ---------- Minerais ----------
@@ -399,6 +499,8 @@
     if (state.tab === 'enchant') {
       const c = state.cat ? cat(state.cat) : null;
       APP.innerHTML = c ? renderCategory(c) : renderHome();
+    } else if (state.tab === 'structures') {
+      APP.innerHTML = renderStructures();
     } else if (state.tab === 'trades') {
       APP.innerHTML = renderTrades();
     } else if (state.tab === 'ores') {
@@ -429,6 +531,8 @@
       state.sel = kitSelection(cat(state.cat)); recalc();
     }
     else if (a === 'back') { state.cat = null; state.sel = {}; state.result = null; }
+    else if (a === 'struct-open') { state.struct.id = el.dataset.id; state.struct.q = ''; window.scrollTo({ top: 0 }); }
+    else if (a === 'struct-back') { state.struct.id = null; window.scrollTo({ top: 0 }); }
     else if (a === 'trade-open') { state.trade.prof = el.dataset.id; window.scrollTo({ top: 0 }); }
     else if (a === 'trade-back') { state.trade.prof = null; window.scrollTo({ top: 0 }); }
     else if (a === 'reset-kit') { state.sel = kitSelection(cat(state.cat)); recalc(); }

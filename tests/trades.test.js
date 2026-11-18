@@ -21,7 +21,7 @@ for (const p of T) {
         assert.ok(x.name && x.n, 'objet sans nom ou quantité');
         if (x.icon) {
           withIcon++;
-          assert.ok(fs.existsSync(`${__dirname}/../assets/trade-icons/${x.icon}.png`), `icône manquante : ${x.icon}`);
+          assert.ok(fs.existsSync(`${__dirname}/../assets/item-icons/${x.icon}.png`), `icône manquante : ${x.icon}`);
         }
       }
     }
