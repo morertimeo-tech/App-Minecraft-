@@ -7,7 +7,7 @@ Application web mobile (HTML/CSS/JS, sans build) avec :
 
 3. **Minerais** : meilleur niveau Y et plage de génération de chaque minerai (Overworld et Nether).
 4. **Structures** : 23 structures (village, cité antique, bastion, cité de l'End…) avec biomes, commande `/locate` et butins possibles par coffre (929 lignes, chance de trouver chaque objet). La recherche répond aussi à « où trouver tel objet ».
-5. **Raretés** : 26 objets et blocs parmi les plus rares (œuf de dragon, élytres, pomme dorée enchantée, trident…), avec la rareté du jeu (épique, rare, peu commun), s'ils sont renouvelables, où les trouver et la chance de les obtenir.
+5. **Raretés** : le podium des 3 choses les plus rares de chaque sous-catégorie (objets, mobs, blocs, minerais, structures), avec leur taux d'apparition ou d'obtention et où les trouver.
 6. **Échanges** : tous les échanges des 13 professions de villageois et du colporteur (283 échanges, par niveau), avec recherche d'un objet dans toutes les professions.
 
 ## Lancer l'app
@@ -69,7 +69,7 @@ python3 -I tools/extract_structures.py <dossier wiki> structures_raw.json
 python3 -I tools/build_structures.py structures_raw.json <dossier assets 26.1> .
 ```
 
-- **Raretés** : le choix des objets est subjectif (« les plus rares »). La rareté et la renouvelabilité sont celles de l'infobox du wiki ; les chances viennent des pages du wiki et des données de butin de l'onglet Structures. La tête de dragon et le crâne de wither n'ont pas d'icône dans mes textures.
+- **Raretés** : les taux de sous-catégories différentes ne se comparent pas (par mort, par coffre, par naissance, par région de chunks). Le trident de noyé (≈ 0,53 %) est un calcul à partir de deux valeurs du wiki. Pour les minerais, le wiki ne donne que des étiquettes d'abondance, pas de pourcentage. Les structures sont classées par espacement de génération (hors contrainte de biome, qui les rend encore plus rares).
 
 ## Limites connues
 

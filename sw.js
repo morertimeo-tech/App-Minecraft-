@@ -1,6 +1,6 @@
 // Service worker : met toute l'app en cache pour l'usage hors-ligne.
 // Changer CACHE à chaque mise à jour pour forcer le rafraîchissement.
-const CACHE = 'enchant-lab-v8';
+const CACHE = 'enchant-lab-v9';
 const FILES = [
   './', './index.html', './manifest.webmanifest',
   './assets/armorstand.png',
@@ -22,6 +22,7 @@ const FILES = [
   './assets/item-icons/apple.png',
   './assets/item-icons/archer_pottery_sherd.png',
   './assets/item-icons/arrow.png',
+  './assets/item-icons/axolotl_spawn_egg.png',
   './assets/item-icons/azure_bluet.png',
   './assets/item-icons/baked_potato.png',
   './assets/item-icons/bamboo.png',
@@ -131,6 +132,7 @@ const FILES = [
   './assets/item-icons/diamond_horse_armor.png',
   './assets/item-icons/diamond_leggings.png',
   './assets/item-icons/diamond_nautilus_armor.png',
+  './assets/item-icons/diamond_ore.png',
   './assets/item-icons/diamond_pickaxe.png',
   './assets/item-icons/diamond_shovel.png',
   './assets/item-icons/diamond_spear.png',
@@ -180,6 +182,7 @@ const FILES = [
   './assets/item-icons/gold_block.png',
   './assets/item-icons/gold_ingot.png',
   './assets/item-icons/gold_nugget.png',
+  './assets/item-icons/gold_ore.png',
   './assets/item-icons/golden_apple.png',
   './assets/item-icons/golden_axe.png',
   './assets/item-icons/golden_boots.png',
@@ -234,6 +237,7 @@ const FILES = [
   './assets/item-icons/kelp.png',
   './assets/item-icons/lantern.png',
   './assets/item-icons/lapis_lazuli.png',
+  './assets/item-icons/lapis_ore.png',
   './assets/item-icons/large_fern_top.png',
   './assets/item-icons/lava_bucket.png',
   './assets/item-icons/lead.png',
@@ -264,6 +268,7 @@ const FILES = [
   './assets/item-icons/melon_seeds.png',
   './assets/item-icons/milk_bucket.png',
   './assets/item-icons/miner_pottery_sherd.png',
+  './assets/item-icons/mooshroom_spawn_egg.png',
   './assets/item-icons/moss_block.png',
   './assets/item-icons/mourner_pottery_sherd.png',
   './assets/item-icons/music_disc_13.png',
@@ -365,6 +370,7 @@ const FILES = [
   './assets/item-icons/shaper_armor_trim_smithing_template.png',
   './assets/item-icons/sheaf_pottery_sherd.png',
   './assets/item-icons/shears.png',
+  './assets/item-icons/sheep_spawn_egg.png',
   './assets/item-icons/shelf_mushroom.png',
   './assets/item-icons/shelter_pottery_sherd.png',
   './assets/item-icons/short_grass.png',

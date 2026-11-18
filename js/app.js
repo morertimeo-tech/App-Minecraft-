@@ -37,6 +37,7 @@
     showOthers: false, // section « Autres enchantements » dépliée
     trade: { prof: null, q: '' }, // onglet Échanges : profession ouverte, recherche
     struct: { id: null, q: '' },  // onglet Structures : structure ouverte, recherche
+    rareSub: 'items',             // onglet Raretés : sous-catégorie
     trim: trimState,
   };
 
@@ -460,59 +461,39 @@
       <div id="struct-body">${structureBody()}</div>`;
   }
 
-  // ---------- Raretés ----------
-  const TIERS = [
-    { key: 'Épique', color: '#ff55ff', label: 'Épique', hint: 'nom violet' },
-    { key: 'Rare', color: '#55ffff', label: 'Rare', hint: 'nom cyan' },
-    { key: 'Peu commun', color: '#ffff55', label: 'Peu commun', hint: 'nom jaune' },
-    { key: null, color: '#b8b0d6', label: 'Rareté du jeu non indiquée', hint: '' },
-  ];
+  // ---------- Raretés : podium des 3 plus rares par sous-catégorie ----------
+  const SUB_ICON = { items: 'trident', mobs: 'axolotl_spawn_egg', blocks: 'dragon_egg', ores: 'ancient_debris_side', structures: 'ender_eye' };
 
-  // Chances de coffre issues de l'onglet Structures (mêmes données que là-bas).
-  function lootSources(names) {
-    const out = [];
-    for (const st of STRUCTS) for (const c of st.containers) for (const r of c.rows) {
-      if (names.includes(r.name)) out.push({ where: `${st.name} · ${c.name}`, chance: r.chance, qty: r.qty });
-    }
-    return out.sort((a, b) => chanceNum(b.chance) - chanceNum(a.chance));
-  }
-
-  function rareCard(e) {
-    const tier = TIERS.find((t) => t.key === e.tier);
-    const loot = e.loot.length ? lootSources(e.loot) : [];
-    const renewCls = e.renew && e.renew.startsWith('Oui') ? 'ok' : (e.renew ? 'no' : '');
-    const li = (w, chance, note) => `
-      <li><span class="src-where">${esc(w)}</span>${chance ? `<span class="src-pct">${esc(chance)}</span>` : ''}${note ? `<small>${esc(note)}</small>` : ''}</li>`;
-    const first = loot.slice(0, 4);
-    const rest = loot.slice(4);
+  function rareCard(e, all) {
+    const tie = all.filter((x) => x.rank === e.rank).length > 1;
     return `
-      <article class="ore-card rare-card" style="--tier:${tier.color}">
+      <article class="ore-card rare-card medal-${e.rank}">
+        <span class="medal" title="${tie ? 'ex æquo' : ''}">${e.rank}</span>
         <span class="slot">${sIcon(e.icon)}</span>
         <div class="ore-main">
           <div class="ore-top"><strong>${esc(e.name)}</strong></div>
-          <div class="chips" style="margin-top:6px">
-            <span class="chip">${esc(e.kind)}</span>
-            ${e.tier ? `<span class="chip tierchip">${esc(e.tier)}</span>` : ''}
-            ${e.renew ? `<span class="chip ${renewCls}">${e.renew.startsWith('Oui') ? '♻ Renouvelable' : 'Non renouvelable' + (e.renew.includes('(') ? ' ' + esc(e.renew.slice(e.renew.indexOf('('))) : '')}</span>` : ''}
-          </div>
-          <ul class="srcs">
-            ${e.sources.map((x) => li(x.where, x.chance, x.note)).join('')}
-            ${first.map((x) => li(x.where, x.chance, x.qty !== '1' ? 'Quantité : ' + qtyText(x.qty) : '')).join('')}
-          </ul>
-          ${rest.length ? `<details class="more"><summary>${rest.length} autre${rest.length > 1 ? 's' : ''} source${rest.length > 1 ? 's' : ''}</summary><ul class="srcs">${rest.map((x) => li(x.where, x.chance, '')).join('')}</ul></details>` : ''}
+          <div class="rate"><b>${esc(e.rate)}</b><small>${esc(e.rateNote)}${tie ? ' · ex æquo' : ''}</small></div>
+          ${e.chips.length ? `<div class="chips" style="margin-top:6px">${e.chips.map((c) => `<span class="chip ${c === 'Renouvelable' ? 'ok' : (c.startsWith('Non') ? 'no' : 'tierchip')}">${esc(c)}</span>`).join('')}</div>` : ''}
+          <p class="srcwhere"><span>Où ?</span> ${esc(e.where)}</p>
           ${e.note ? `<p class="ore-note">${esc(e.note)}</p>` : ''}
         </div>
       </article>`;
   }
 
   function renderRare() {
+    const sub = RARE.find((x) => x.id === state.rareSub) || RARE[0];
     return `
-      <p class="hint" style="margin:6px 2px 0">Les objets et blocs les plus rares, avec où les trouver et la chance de les obtenir. La <b>rareté</b> est celle du jeu (couleur du nom de l'objet) ; les <b>%</b> sont les chances par coffre, par mort ou par événement. Le sigle « non renouvelable » veut dire qu'on ne peut pas en obtenir davantage une fois la source épuisée.</p>
-      ${TIERS.map((t) => {
-        const list = RARE.filter((e) => e.tier === t.key);
-        return list.length ? `<h2 class="section" style="color:${t.color}">${esc(t.label)}${t.hint ? ` <small style="font-family:system-ui;color:var(--muted)">(${t.hint})</small>` : ''}</h2>${list.map(rareCard).join('')}` : '';
-      }).join('')}
-      <p class="disclaimer">Source : minecraft.wiki (pages de chaque objet et de ses structures), Java Edition. Les noms français sont à vérifier ; la tête de dragon et le crâne de wither n'ont pas d'icône.</p>`;
+      <p class="hint" style="margin:6px 2px 0">Ce qui a un taux d'apparition ou d'obtention <b>très faible</b>, par catégorie : le podium des 3 plus rares.</p>
+      <div class="pills" role="tablist">
+        ${RARE.map((c) => `
+          <button class="pill" role="tab" data-action="rare-sub" data-v="${c.id}" aria-selected="${c.id === sub.id}">
+            <img class="px" src="${ASSETS}/item-icons/${SUB_ICON[c.id]}.png" alt="" />${esc(c.name)}
+          </button>`).join('')}
+      </div>
+      <h2 class="section">${esc(sub.name)}</h2>
+      <p class="hint" style="margin:0 2px 10px">${esc(sub.metric)}</p>
+      ${sub.entries.map((e) => rareCard(e, sub.entries)).join('')}
+      <p class="disclaimer">Source : minecraft.wiki (Java Edition) et les butins de l'onglet Structures. Les taux de catégories différentes ne se comparent pas entre eux (par mort, par coffre, par naissance…). Noms français à vérifier.</p>`;
   }
 
   // ---------- Minerais ----------
@@ -589,6 +570,7 @@
       state.sel = kitSelection(cat(state.cat)); recalc();
     }
     else if (a === 'back') { state.cat = null; state.sel = {}; state.result = null; }
+    else if (a === 'rare-sub') { state.rareSub = el.dataset.v; }
     else if (a === 'struct-open') { state.struct.id = el.dataset.id; state.struct.q = ''; window.scrollTo({ top: 0 }); }
     else if (a === 'struct-back') { state.struct.id = null; window.scrollTo({ top: 0 }); }
     else if (a === 'trade-open') { state.trade.prof = el.dataset.id; window.scrollTo({ top: 0 }); }

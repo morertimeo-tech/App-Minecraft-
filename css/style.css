@@ -354,3 +354,21 @@ details.more > summary { cursor: pointer; color: var(--aqua); font-size: 13px; }
 .tabbar { gap: 2px; padding-left: 4px; padding-right: 4px; }
 .tab { padding: 6px 1px; }
 .tab span { font-size: 9.5px; letter-spacing: -0.2px; text-overflow: clip; }
+
+/* ---------- Raretés : podium ---------- */
+.pills { display: flex; gap: 8px; overflow-x: auto; padding: 12px 2px 4px; scrollbar-width: none; }
+.pills::-webkit-scrollbar { display: none; }
+.pill { flex: none; display: inline-flex; align-items: center; gap: 6px; padding: 7px 12px; border-radius: 999px; font: inherit; font-size: 13px;
+  color: var(--muted); background: #211b31; border: 2px solid #120e1d; cursor: pointer; }
+.pill img { width: 20px; height: 20px; image-rendering: pixelated; }
+.pill[aria-selected="true"] { color: var(--text); border-color: var(--gold); background: #2e2645; }
+.rare-card { border-left: 0; position: relative; }
+.medal { position: absolute; top: -6px; left: -6px; width: 26px; height: 26px; border-radius: 50%; display: grid; place-items: center;
+  font-family: "Press Start 2P", monospace; font-size: 11px; color: #1a1020; border: 2px solid #000; z-index: 1; }
+.medal-1 .medal { background: #ffd24a; } .medal-2 .medal { background: #d4dcec; } .medal-3 .medal { background: #d98a4b; }
+.medal-1 { border-color: #7a5a14; } .medal-2 { border-color: #5a6275; } .medal-3 { border-color: #6a4020; }
+.rate { margin-top: 4px; display: flex; align-items: baseline; flex-wrap: wrap; gap: 4px 10px; }
+.rate b { font-family: "Press Start 2P", monospace; font-weight: 400; font-size: 14px; color: var(--gold); text-shadow: 1px 1px 0 #000; }
+.rate small { color: var(--muted); font-size: 12px; }
+.srcwhere { margin: 8px 0 0; font-size: 13.5px; font-weight: 600; }
+.srcwhere span { color: var(--aqua); }

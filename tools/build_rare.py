@@ -1,14 +1,15 @@
 #!/usr/bin/env python3
-"""Génère js/rare-data.js : les objets et blocs les plus rares du jeu.
+"""Génère js/rare-data.js : le podium des 3 choses les plus rares de chaque sous-catégorie.
 
 Usage : python3 -I tools/build_rare.py PACK_26_1_DIR OUT_REPO_DIR
 
-Chaque entrée vient de la page wiki de l'objet (minecraft.wiki, Java Edition) :
-  - tier  = « Rarity » de l'infobox (couleur du nom dans le jeu : Épique, Rare, Peu commun)
-  - renew = « Renewable » de l'infobox
-  - sources manuelles = taux de drop / conditions lus sur la page de l'objet
-  - loot  = noms d'objets dont les coffres sont calculés dans l'app depuis les données
-            de structures (js/structures-data.js), pour rester cohérent avec l'onglet Structures.
+Sous-catégories : objets, mobs, blocs, minerais, structures. Chaque taux vient du wiki
+(minecraft.wiki, Java Edition) ou de nos données de butin (js/structures-data.js) :
+  - mobs      : pages Axolotl, Mooshroom, Sheep (probabilités d'apparition / de naissance)
+  - minerais  : page Ore (« Abundance »)
+  - structures: page Structure set (espacement, probabilité, anneaux de forteresses)
+  - objets / blocs : pages Trident, Smithing Template, Dragon Egg + coffres (onglet Structures)
+`check` sert aux tests : le pourcentage doit se retrouver dans les butins de structures.
 Les noms français sont écrits de mémoire.
 """
 import json, os, re, runpy, shutil, sys
@@ -18,84 +19,88 @@ HERE = os.path.dirname(os.path.abspath(__file__))
 C = runpy.run_path(os.path.join(HERE, 'common.py'))
 resolve = C['make_resolver'](pack)
 
-EPIC, RARE, UNC, NONE = 'Épique', 'Rare', 'Peu commun', None
+def e(rank, name, icon, rate, rate_note, where, chips=(), note=None, check=None):
+    d = dict(rank=rank, name=name, icon=icon, rate=rate, rateNote=rate_note, where=where, chips=list(chips), note=note)
+    if check: d['check'] = check
+    return d
 
-def E(name, en, kind, tier, renew, sources=(), loot=(), note=None, icon=None):
-    return dict(name=name, en=en, kind=kind, tier=tier, renew=renew, sources=list(sources), loot=list(loot), note=note, icon=icon or en)
-
-ENTRIES = [
- # ---- Épique -------------------------------------------------------------
- E('Œuf de dragon', 'Dragon Egg', 'Bloc', EPIC, 'Non',
-   [dict(where="Vaincre l'Ender Dragon", note="Une seule fois par monde (deux fois en Bedrock). Il se téléporte pour éviter d'être miné.")]),
- E('Élytres', 'Elytra', 'Objet', EPIC, 'Non',
-   [dict(where="Vaisseau de l'End (cité de l'End, îles extérieures)", note="Dans un cadre de la salle au trésor ; un shulker garde l'élytre et les deux coffres du vaisseau.")]),
- E('Tête de dragon', 'Dragon Head', 'Bloc', EPIC, 'Non',
-   [dict(where="Proue d'un vaisseau de l'End (cité de l'End)", note="Seule source dans le jeu.")], icon='Dragon Head'),
- E('Cœur lourd', 'Heavy Core', 'Bloc', EPIC, 'Non (sauf vault sinistre)', loot=['Cœur lourd'],
-   note="Sert à fabriquer une masse avec une verge de brise."),
- E('Modèle de forge : Silence', 'Silence Armor Trim', 'Objet', EPIC, 'Non', loot=['Modèle de forge : Silence']),
- # ---- Rare ---------------------------------------------------------------
- E('Pomme dorée enchantée', 'Golden Apple', 'Objet', RARE, 'Non (sauf vault sinistre)', loot=['Pomme dorée enchantée'],
-   note="Ne se fabrique plus : on ne la trouve que dans des coffres.", icon='Enchanted Golden Apple'),
- E('Trident', 'Trident', 'Objet', RARE, 'Oui',
-   [dict(where='Noyé armé d\'un trident', chance='6,25 %', note="6,25 % des noyés apparaissent avec un trident. Tué par un joueur ou un loup apprivoisé, il le lâche dans 8,5 % des cas (Java), +1 % par niveau de Butin.")],
-   loot=['Trident']),
- E('Étoile du Nether', 'Nether Star', 'Objet', RARE, 'Oui',
-   [dict(where='Wither (boss à invoquer)', chance='100 %', note="Toujours 1 à sa mort.")]),
- E('Balise', 'Beacon', 'Bloc', RARE, 'Oui',
-   [dict(where='Fabrication', note="Verre, étoile du Nether et obsidienne.")]),
- E('Disque : Pigstep', 'Music Disc (Pigstep)', 'Objet', RARE, None, loot=['Disque : Pigstep']),
- E('Disque : Otherside', 'Music Disc (otherside)', 'Objet', RARE, None, loot=['Disque : otherside']),
- E('Disque : Creator', 'Music Disc (Creator)', 'Objet', RARE, None, loot=['Disque : Creator']),
- E('Modèle de forge : Ward', 'Ward Armor Trim', 'Objet', RARE, 'Non', loot=['Modèle de forge : Ward']),
- E('Modèle de forge : Eye', 'Eye Armor Trim', 'Objet', RARE, 'Non (sauf vault)', loot=['Modèle de forge : Eye']),
- E('Modèle de forge : Vex', 'Vex Armor Trim', 'Objet', RARE, 'Non (sauf vault)', loot=['Modèle de forge : Vex']),
- E('Modèle de forge : Spire', 'Spire Armor Trim', 'Objet', RARE, 'Non (sauf vault)', loot=['Modèle de forge : Spire']),
- # ---- Peu commun ---------------------------------------------------------
- E("Modèle d'amélioration en netherite", 'Netherite Upgrade', 'Objet', UNC, 'Non', loot=['Amélioration en netherite'],
-   note="Indispensable pour passer un équipement en diamant à la netherite."),
- E("Cœur de l'océan", 'Heart of the Sea', 'Objet', UNC, 'Non',
-   [dict(where='Carte au trésor', note="La carte, trouvée dans les épaves et parfois les ruines océaniques, marque le coffre d'une croix rouge.")],
-   loot=["Cœur de l'océan"]),
- E('Coquille de nautile', 'Nautilus Shell', 'Objet', UNC, 'Oui',
-   [dict(where='Noyé', chance='3 %', note="3 % des noyés apparaissent avec une coquille de nautile (Java) et la lâchent toujours à leur mort.")]),
- E('Œuf de renifleur', 'Sniffer Egg', 'Bloc', UNC, 'Oui',
-   [dict(where='Élevage de deux renifleurs', note="Avec des graines de fleur-torche.")],
-   loot=['Œuf de renifleur']),
- E("Totem d'immortalité", 'Totem of Undying', 'Objet', UNC, 'Oui',
-   [dict(where='Évocateur (manoir, raids)', chance='100 %', note="Chaque évocateur en lâche toujours un, sans effet de Butin.")]),
- E('Disque : Relic', 'Music Disc (Relic)', 'Objet', UNC, None, loot=['Disque : Relic']),
- # ---- Rareté non indiquée par le jeu -------------------------------------
- E('Débris antiques', 'Ancient Debris', 'Bloc', NONE, 'Non',
-   [dict(where='Nether, surtout entre y 8 et 24', note="Minerai « très rare » selon le wiki ; plus fréquent à y 16. À fondre pour la netherite.")]),
- E('Crâne de squelette wither', 'Wither Skeleton Skull', 'Objet', NONE, None,
-   [dict(where='Squelette wither (forteresse du Nether)', chance='2,5 %', note="3,5 % / 4,5 % / 5,5 % avec Butin I / II / III. Sert à invoquer le Wither.")]),
- E('Rose de wither', 'Wither Rose', 'Bloc', NONE, 'Oui',
-   [dict(where='Mort causée par un wither', note="Se laisse quand un mob ou un joueur est tué par le Wither.")]),
- E('Carapace de shulker', 'Shulker Shell', 'Objet', NONE, None,
-   [dict(where="Shulker (cités de l'End)", chance='50 %', note="Seule source de carapaces, pour fabriquer des boîtes de shulker. Augmente avec Butin.")]),
+SUB = [
+ dict(id='items', name='Objets', metric="Chance d'obtenir l'objet (par mort de mob ou par coffre)", entries=[
+   e(1, 'Trident', 'Trident', '≈ 0,53 %', 'par noyé tué',
+     "Noyé armé d'un trident",
+     ['Rare', 'Renouvelable'],
+     "6,25 % des noyés apparaissent avec un trident et le lâchent dans 8,5 % des cas (Java) : 6,25 % × 8,5 % ≈ 0,53 %. Calcul fait à partir des valeurs du wiki ; +1 % de lâcher par niveau de Butin. Aussi 2,1 % dans les vaults des chambres d'épreuves."),
+   e(2, 'Armure en diamant pour nautile', 'Diamond Nautilus Armor', '1,1 %', 'par coffre',
+     "Épaves, ruines océaniques, trésor enterré", [],
+     "Chance de l'avoir dans chaque coffre concerné (butin le plus rare des coffres marins).", check=dict(name='Armure en diamant pour nautile', chance='1.1%')),
+   e(3, 'Modèle de forge : Silence', 'Silence Armor Trim', '1,2 %', 'par coffre',
+     "Cité antique (coffres)", ['Épique', 'Non renouvelable'],
+     "La rareté la plus haute des modèles de forge.", check=dict(name='Modèle de forge : Silence', chance='1.2%')),
+ ]),
+ dict(id='mobs', name='Mobs', metric="Probabilité d'apparition ou de naissance de la variante rare", entries=[
+   e(1, 'Axolotl bleu', 'Axolotl Spawn Egg', '0,083 %', 'soit 1 chance sur 1 200',
+     "Élevage d'axolotls", [],
+     "Lors de la reproduction de deux axolotls, le petit a 1 chance sur 1 200 d'être bleu (variante rare)."),
+   e(2, 'Mooshroom brun', 'Mooshroom Spawn Egg', '≈ 0,098 %', 'soit 1 chance sur 1 024',
+     "Élevage de deux mooshrooms rouges", [],
+     "Un petit brun naît 1 fois sur 1 024. Un éclair à moins de 4 blocs change aussi la couleur d'un mooshroom."),
+   e(3, 'Mouton rose', 'Sheep Spawn Egg', '0,164 %', 'par apparition naturelle',
+     "Biomes tempérés (plaines, forêts, marais, prairie…)", [],
+     "Couleur « très rare » : les moutons blancs (81,836 %), noirs, gris, gris clair (5 % chacun) et bruns (3 %) sont bien plus fréquents."),
+ ]),
+ dict(id='blocks', name='Blocs', metric="Chance de trouver le bloc (par coffre ou une seule fois)", entries=[
+   e(1, 'Œuf de dragon', 'Dragon Egg', '1 par monde', 'unique (2 en Bedrock)',
+     "Vaincre l'Ender Dragon", ['Épique', 'Non renouvelable'],
+     "Il se téléporte pour éviter d'être miné. Obtenable une seule fois par monde en Java."),
+   e(2, 'Bloc de diamant', 'Block of Diamond', '0,3 %', 'par pot décoré',
+     "Pots décorés des couloirs des chambres d'épreuves", [],
+     "Aussi 2,3 % dans les coffres d'intersection et 2,8 % dans les vaults sinistres.", check=dict(name='Bloc de diamant', chance='0.3%')),
+   e(3, "Bloc d'émeraude", 'Block of Emerald', '1,4 %', 'par pot décoré',
+     "Pots décorés des couloirs des chambres d'épreuves", [], None, check=dict(name="Bloc d'émeraude", chance='1.4%')),
+ ]),
+ dict(id='ores', name='Minerais', metric="Abondance indiquée par le wiki (le meilleur niveau Y est celui où il est le plus trouvé)", entries=[
+   e(1, 'Débris antiques', 'Ancient Debris', 'Très rare', 'abondance (wiki)',
+     "Nether, surtout autour de y 16", ['Non renouvelable'],
+     "Seule source de netherite. Rare au-delà de y 24 ; aucun à y 120 et au-dessus."),
+   e(2, 'Minerai de diamant', 'Diamond Ore', 'Très rare', 'abondance (wiki)',
+     "Overworld, surtout autour de y −59", [],
+     "Aucun diamant à y 16 et au-dessus."),
+   e(3, 'Minerai de lapis-lazuli', 'Lapis Ore', 'Rare', 'abondance (wiki)',
+     "Overworld, surtout autour de y −2", [],
+     "Ex æquo avec l'or (« rare » aussi)."),
+   e(3, "Minerai d'or", 'Gold Ore', 'Rare', 'abondance (wiki)',
+     "Overworld, surtout autour de y −18", [],
+     "Dans les badlands, l'or est « commun » (filons supplémentaires de y 32 à 256)."),
+ ]),
+ dict(id='structures', name='Structures', metric="Fréquence de génération (espacement et probabilité du wiki)", entries=[
+   e(1, 'Forteresse (stronghold)', 'Eye of Ender', '128 par monde', 'en tout, par anneaux',
+     "Tous les biomes de l'Overworld", [],
+     "Seules 128 forteresses existent dans un monde Java, placées en anneaux concentriques."),
+   e(2, 'Manoir', 'Totem of Undying', '1 pour 6 400 chunks', 'région de 80 × 80',
+     "Forêt sombre, jardin pâle", [],
+     "Espacement de 80 chunks, le plus grand des structures. Il faut en plus le bon biome, donc il est encore plus rare en pratique."),
+   e(3, 'Avant-poste de pillards', 'Crossbow', '≈ 1 pour 5 120 chunks', 'région de 32 × 32, 20 %',
+     "Plaines, désert, savane, taïga, plaines enneigées, bosquet, prairie…", [],
+     "Une région de 32 × 32 chunks sur 5 en reçoit un (20 %), à au moins 10 chunks d'un village."),
+ ]),
 ]
 
 icons_dir = out + '/assets/item-icons'
 os.makedirs(icons_dir, exist_ok=True)
 slug = lambda n: re.sub(r'[^a-z0-9]+', '_', n.lower().replace("'", '')).strip('_')
 missing = []
-def icon(name):
-    key = slug(C['icon_base'](name))
-    src = resolve(name)
-    if not src:
-        missing.append(name); return None
-    dst = f'{icons_dir}/{key}.png'
-    if not os.path.exists(dst): shutil.copyfile(src, dst)
-    return key
-
-res = []
-for e in ENTRIES:
-    d = {k: e[k] for k in ('name', 'kind', 'tier', 'renew', 'sources', 'loot', 'note')}
-    d['icon'] = icon(e['icon'])
-    res.append(d)
+for sc in SUB:
+    for en in sc['entries']:
+        name = en['icon']
+        src = resolve(name)
+        if not src:
+            missing.append(name); en['icon'] = None; continue
+        key = slug(C['icon_base'](name))
+        dst = f'{icons_dir}/{key}.png'
+        if not os.path.exists(dst): shutil.copyfile(src, dst)
+        en['icon'] = key
 
 js = ('/* Généré par tools/build_rare.py (minecraft.wiki, Java Edition). Ne pas éditer à la main. */\n'
-      'window.MC_RARE = ' + json.dumps(res, ensure_ascii=False, separators=(',', ':')) + ';\n')
+      'window.MC_RARE = ' + json.dumps(SUB, ensure_ascii=False, separators=(',', ':')) + ';\n')
 open(out + '/js/rare-data.js', 'w', encoding='utf-8').write(js)
-print(len(res), 'entrées ; sans icône :', missing)
+print(sum(len(s['entries']) for s in SUB), 'entrées dans', len(SUB), 'sous-catégories ; sans icône :', missing)

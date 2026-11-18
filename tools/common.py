@@ -179,7 +179,7 @@ ALIAS.update({
  'Disc Fragment (5)': 'disc_fragment_5', 'Netherite Upgrade': 'netherite_upgrade_smithing_template', 'Ominous Bottle I - II': 'ominous_bottle',
  'Ominous Bottle III - V': 'ominous_bottle', 'Heart of the Sea': 'heart_of_the_sea', 'Iron Chain': 'iron_chain', 'Steak': 'beef' if False else 'cooked_beef',
  'Spider Eye': 'spider_eye', 'Egg': 'egg', 'Rail': 'rail', 'Honey Bottle': 'honey_bottle', 'Fire Charge': 'fire_charge', 'Flint and Steel': 'flint_and_steel',
- 'Obsidian': 'obsidian', 'Candle': 'candle', 'Enchanted Golden Apple': 'golden_apple', 'Light Weighted Pressure Plate': 'gold_block',
+ 'Obsidian': 'obsidian', 'Candle': 'candle', 'Diamond Ore': 'diamond_ore', 'Gold Ore': 'gold_ore', 'Lapis Ore': 'lapis_ore', 'Dragon Egg': 'dragon_egg', 'Enchanted Golden Apple': 'golden_apple', 'Light Weighted Pressure Plate': 'gold_block',
  'Snout Banner Pattern': 'piglin_banner_pattern', 'Eye of Ender': 'ender_eye', 'Totem of Undying': 'totem_of_undying', 'Oak Hanging Sign': 'oak_hanging_sign', 'Spruce Sign': 'spruce_sign', 'Spyglass': 'spyglass', 'Lead': 'lead',
 })
 def icon_base(name):
