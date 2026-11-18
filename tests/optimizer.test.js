@@ -90,4 +90,23 @@ assert.strictEqual(optimize(bootSet).total, brute(bootSet, 39));
 const heavy = [E('thorns', 3), E('soul_speed', 3), E('curse_binding', 1), E('swift_sneak', 3), E('silk_touch', 1)];
 r = optimize(heavy, { creative: true });
 assert.ok(r.ok && !r.overCap);
+// ---- 6. Les « meilleurs kits » respectent les règles du jeu
+for (const c of DATA.CATEGORIES) {
+  const kit = DATA.KITS[c.id];
+  assert.ok(kit, `pas de kit pour ${c.id}`);
+  const input = kit.list.map(([id, level]) => ({ id, level }));
+  for (const e of input) {
+    assert.ok(c.enchants.includes(e.id), `${c.id} : ${e.id} non applicable`);
+    assert.ok(e.level <= DATA.ENCHANTS[e.id][1], `${c.id} : ${e.id} niveau trop haut`);
+  }
+  const res = optimize(input);
+  assert.ok(res.ok, `${c.id} : kit invalide (${res.error})`);
+  console.log(`kit ${c.id}: ${input.length} enchantements, ${res.total} niveaux (naïf ${res.naive})`);
+}
+// Les combinaisons impossibles de l'image sont bien refusées
+assert.strictEqual(optimize([E('infinity', 1), E('mending', 1)]).ok, false);
+assert.strictEqual(optimize([E('multishot', 1), E('piercing', 4)]).ok, false);
+assert.strictEqual(optimize([E('density', 5), E('breach', 4)]).ok, false);
+assert.strictEqual(optimize([E('riptide', 3), E('loyalty', 3)]).ok, false);
+assert.strictEqual(optimize([E('knockback', 3)]).ok, false);
 console.log('OK : tous les tests passent');

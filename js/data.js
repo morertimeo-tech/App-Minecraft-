@@ -100,6 +100,81 @@
       enchants: ['efficiency', ...GENERIC] },
   ];
 
+
+  // Meilleur kit par équipement : [id, niveau]. Inspiré d'un visuel « Best PvP kit »,
+  // corrigé selon les règles réelles du jeu : ce visuel contenait des combinaisons
+  // impossibles (voir `note`) qui ont été retirées.
+  const A_BASE = [['protection', 4], ['unbreaking', 3], ['mending', 1], ['thorns', 3]];
+  const KITS = {
+    helmet: { list: [...A_BASE, ['aqua_affinity', 1], ['respiration', 3]] },
+    chestplate: { list: A_BASE },
+    leggings: {
+      list: [...A_BASE, ['swift_sneak', 3]],
+      note: "Chute amortie et Agilité aquatique ne vont que sur les bottes. Pour les jambières, on prend Furtivité rapide III, leur seul enchantement propre.",
+    },
+    boots: { list: [...A_BASE, ['feather_falling', 4], ['depth_strider', 3], ['soul_speed', 3]] },
+    sword: {
+      list: [['sharpness', 5], ['unbreaking', 3], ['mending', 1], ['fire_aspect', 2], ['sweeping_edge', 3], ['knockback', 2]],
+      note: "Recul s'arrête au niveau II (pas de III dans le jeu).",
+    },
+    spear: { list: [['sharpness', 5], ['lunge', 3], ['knockback', 2], ['fire_aspect', 2], ['looting', 3], ['unbreaking', 3], ['mending', 1]] },
+    mace: {
+      list: [['density', 5], ['unbreaking', 3], ['wind_burst', 3], ['mending', 1]],
+      note: "Brèche est incompatible avec Densité : on ne peut pas avoir les deux. Contre des armures, remplace Densité V par Brèche IV.",
+    },
+    axe: { list: [['sharpness', 5], ['unbreaking', 3], ['mending', 1], ['efficiency', 5], ['silk_touch', 1]] },
+    pickaxe: {
+      list: [['efficiency', 5], ['unbreaking', 3], ['mending', 1], ['silk_touch', 1]],
+      note: "Pour miner des minerais, Fortune III remplace Toucher de soie (les deux sont incompatibles).",
+    },
+    shovel: { list: [['efficiency', 5], ['unbreaking', 3], ['mending', 1], ['silk_touch', 1]] },
+    hoe: { list: [['efficiency', 5], ['unbreaking', 3], ['mending', 1], ['fortune', 3]] },
+    bow: {
+      list: [['power', 5], ['unbreaking', 3], ['flame', 1], ['infinity', 1], ['punch', 2]],
+      note: "Raccommodage est incompatible avec Infinité. Si tu préfères réparer l'arc, remplace Infinité par Raccommodage.",
+    },
+    crossbow: {
+      list: [['quick_charge', 3], ['piercing', 4], ['unbreaking', 3], ['mending', 1]],
+      note: "Tir multiple est incompatible avec Perforation : on garde Perforation IV.",
+    },
+    trident: {
+      list: [['impaling', 5], ['unbreaking', 3], ['mending', 1], ['channeling', 1], ['loyalty', 3]],
+      note: "Impulsion est incompatible avec Loyauté et Canalisation. Pour te propulser dans l'eau, remplace ces deux-là par Impulsion III.",
+    },
+    fishing_rod: { list: [['luck_of_the_sea', 3], ['lure', 3], ['unbreaking', 3], ['mending', 1]] },
+    elytra: { list: [['unbreaking', 3], ['mending', 1]] },
+    shears: { list: [['efficiency', 5], ['unbreaking', 3], ['mending', 1]] },
+  };
+
+  // Minerais : hauteurs (Y) de génération, Java 1.18+ (minecraft.wiki, « Ore (feature) »).
+  // best = Y où le minerai est le plus fréquent (pic de la distribution) ; range = plage de génération.
+  const ORES = [
+    { id: 'diamond', name: 'Diamant', icon: 'diamond', dim: 'overworld', best: [-59], range: [-64, 16],
+      note: "Aucun diamant au-dessus de y 16. Le plus fréquent tout au fond." },
+    { id: 'redstone', name: 'Redstone', icon: 'redstone', dim: 'overworld', best: [-59], range: [-64, 15],
+      note: "Se concentre près du fond de la carte." },
+    { id: 'lapis', name: 'Lapis-lazuli', icon: 'lapis_lazuli', dim: 'overworld', best: [0], range: [-64, 64],
+      note: "Pic autour de y 0 (les mesures du wiki donnent environ −2)." },
+    { id: 'gold', name: 'Or', icon: 'raw_gold', dim: 'overworld', best: [-16], range: [-64, 32],
+      note: "Dans les badlands, de l'or supplémentaire de y 32 à 256." },
+    { id: 'iron', name: 'Fer', icon: 'raw_iron', dim: 'overworld', best: [16, 232], range: [-64, 384],
+      note: "Deux pics : y 16 sous terre, et y 232 en haute montagne." },
+    { id: 'copper', name: 'Cuivre', icon: 'raw_copper', dim: 'overworld', best: [48], range: [-16, 112],
+      note: "Filons plus gros dans les grottes à stalactites." },
+    { id: 'coal', name: 'Charbon', icon: 'coal', dim: 'overworld', best: [96], range: [0, 320],
+      note: "Aussi réparti uniformément de y 136 à 320." },
+    { id: 'emerald', name: 'Émeraude', icon: 'emerald', dim: 'overworld', best: [232], range: [-16, 480],
+      note: "Uniquement en biome de montagne, en blocs isolés. Pic théorique à y 232 ; les mesures du wiki donnent plutôt environ 85." },
+    { id: 'amethyst', name: 'Géode d’améthyste', icon: 'amethyst_shard', dim: 'overworld', best: [], range: [-58, 30],
+      note: "Géodes rares, réparties de y −58 à 30. Pas de pic." },
+    { id: 'ancient_debris', name: 'Débris antiques', icon: 'netherite_scrap', dim: 'nether', best: [16], range: [8, 119],
+      note: "Se trouve surtout entre y 8 et 24 ; au-delà de y 24, c'est rare. À fondre pour la netherite." },
+    { id: 'quartz', name: 'Quartz du Nether', icon: 'quartz', dim: 'nether', best: [], range: [10, 117],
+      note: "Réparti uniformément, sans pic." },
+    { id: 'nether_gold', name: 'Or du Nether', icon: 'gold_nugget', dim: 'nether', best: [], range: [10, 117],
+      note: "Réparti uniformément, sans pic. Donne des pépites d'or." },
+  ];
+
   // Groupes d'enchantements incompatibles entre eux (Java).
   const CONFLICT_GROUPS = [
     ['protection', 'fire_protection', 'blast_protection', 'projectile_protection'],
@@ -173,7 +248,7 @@
   ].map((id) => ({ id, name: id.charAt(0).toUpperCase() + id.slice(1) }));
 
   return {
-    ENCHANTS, CATEGORIES, CONFLICT_GROUPS,
+    ENCHANTS, CATEGORIES, KITS, ORES, CONFLICT_GROUPS,
     ARMOR_MATERIALS, ARMOR_PIECES, DYES, TRIM_MATERIALS, TRIM_PATTERNS,
   };
 });

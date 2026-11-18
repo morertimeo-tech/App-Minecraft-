@@ -253,3 +253,27 @@ h2.section {
 .stand-view canvas { width: 100%; height: 100%; display: block; cursor: grab; }
 .stand-bar { display: flex; align-items: center; justify-content: space-between; gap: 10px; padding: 10px 4px 2px; flex-wrap: wrap; }
 .stand-bar .btn { padding: 8px 12px; font-size: 13px; }
+
+/* ---------- Meilleur kit ---------- */
+.kit-head { display: flex; align-items: center; justify-content: space-between; gap: 10px; margin-bottom: 6px; }
+.kit-title { font-family: "Press Start 2P", monospace; font-size: 11px; color: var(--gold); text-shadow: 1px 1px 0 #000; }
+.btn.small { padding: 6px 10px; font-size: 12px; box-shadow: 0 3px 0 #120e1d; }
+.more-btn { width: 100%; display: flex; justify-content: space-between; align-items: center; background: transparent; border: 0; color: var(--text); font: inherit; font-weight: 600; padding: 6px 4px; cursor: pointer; }
+
+/* ---------- Minerais ---------- */
+.axis { display: flex; justify-content: space-between; color: var(--muted); font-size: 11px; margin: 0 2px 8px; }
+.ore-card { display: flex; gap: 12px; align-items: flex-start; padding: 12px; margin-bottom: 10px;
+  background: linear-gradient(180deg, var(--panel-2), var(--panel)); border: 2px solid #15102a; border-radius: var(--radius);
+  box-shadow: inset 0 2px 0 rgba(255,255,255,.06), inset 0 -3px 0 rgba(0,0,0,.35); }
+.ore-card > img { width: 44px; height: 44px; image-rendering: pixelated; flex: none; background: #1a1528; border-radius: 10px; padding: 4px; border: 2px solid #120e1d; }
+.ore-main { flex: 1; min-width: 0; }
+.ore-top { display: flex; justify-content: space-between; align-items: baseline; gap: 8px; }
+.ore-y { font-family: "Press Start 2P", monospace; font-size: 14px; color: var(--gold); text-shadow: 1px 1px 0 #000; white-space: nowrap; }
+.ore-y.flat { font-family: inherit; font-size: 13px; color: var(--muted); text-shadow: none; }
+.ore-range { color: var(--muted); font-size: 12px; margin-top: 2px; }
+.ybar { position: relative; height: 12px; margin: 8px 0 6px; background: #1a1528; border: 1px solid #000; border-radius: 6px; }
+.ybar .band { position: absolute; top: 1px; bottom: 1px; background: linear-gradient(90deg, #3d8cff, #55ffff); border-radius: 4px; opacity: .85; }
+.ybar .mark { position: absolute; top: -3px; width: 4px; height: 16px; margin-left: -2px; background: var(--gold); border: 1px solid #000; border-radius: 2px; }
+.ore-note { margin: 4px 0 0; font-size: 12.5px; color: var(--text); opacity: .9; }
+
+.steps .cost { margin-left: 8px; }

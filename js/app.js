@@ -31,6 +31,7 @@
     cat: null,       // id de catégorie ouverte
     sel: {},         // { enchantId: level }
     result: null,    // résultat de l'optimiseur
+    showOthers: false, // section « Autres enchantements » dépliée
     trim: trimState,
   };
 
@@ -51,7 +52,7 @@
   function renderHome() {
     const groups = [...new Set(DATA.CATEGORIES.map((c) => c.group))];
     return `
-      <p class="hint" style="margin:6px 2px 0">Choisis un équipement, coche les enchantements voulus, et l'app te donne l'ordre le moins cher à l'enclume.</p>
+      <p class="hint" style="margin:6px 2px 0">Choisis un équipement : le meilleur kit est déjà sélectionné et l'app te donne l'ordre le moins cher à l'enclume. Tu peux l'ajuster.</p>
       ${groups.map((g) => `
         <h2 class="section">${esc(g)}</h2>
         <div class="grid">
@@ -59,37 +60,53 @@
             <button class="tile" data-action="open-cat" data-id="${c.id}">
               <img class="px" src="${ASSETS}/items/${c.icon}.png" alt="" />
               <span>${esc(c.name)}</span>
-              <small>${c.enchants.length} enchantements</small>
+              <small>${DATA.KITS[c.id].list.length} au kit</small>
             </button>`).join('')}
         </div>`).join('')}`;
   }
 
   // ---------- Enchantements : catégorie ----------
+  function enchantRow(id) {
+    const [name, max, itemMult, bookMult] = DATA.ENCHANTS[id];
+    const on = id in state.sel;
+    const lvl = on ? state.sel[id] : max;
+    return `
+      <div class="enchant-row">
+        <label>
+          <input type="checkbox" data-action="toggle" data-id="${id}" ${on ? 'checked' : ''} />
+          <span class="enchant-name">${esc(name)}
+            <span class="badges">
+              <span class="badge" style="color:var(--aqua)" title="Multiplicateur de coût quand l'enchantement vient d'un livre">Livre ×${bookMult}</span>
+              <span class="badge" style="color:var(--muted)" title="Multiplicateur quand il vient d'un objet enchanté">Objet ×${itemMult}</span>
+              <span class="badge" style="color:var(--muted)">max ${roman[max]}</span>
+            </span>
+          </span>
+        </label>
+        <div class="stepper">
+          <button data-action="level" data-id="${id}" data-delta="-1" ${!on || lvl <= 1 ? 'disabled' : ''} aria-label="Niveau moins">−</button>
+          <output>${on ? roman[lvl] : '—'}</output>
+          <button data-action="level" data-id="${id}" data-delta="1" ${!on || lvl >= max ? 'disabled' : ''} aria-label="Niveau plus">+</button>
+        </div>
+      </div>`;
+  }
+
+  const kitOf = (c) => DATA.KITS[c.id];
+  const kitIds = (c) => kitOf(c).list.map(([id]) => id);
+  const kitSelection = (c) => Object.fromEntries(kitOf(c).list);
+
+  // Recalcule l'ordre dès que la sélection change (au moins deux enchantements).
+  function recalc() {
+    if (Object.keys(state.sel).length >= 2) calculate();
+    else state.result = null;
+  }
+
   function renderCategory(c) {
     const selCount = Object.keys(state.sel).length;
-    const rows = c.enchants.map((id) => {
-      const [name, max, itemMult, bookMult] = DATA.ENCHANTS[id];
-      const on = id in state.sel;
-      const lvl = on ? state.sel[id] : max;
-      return `
-        <div class="enchant-row">
-          <label>
-            <input type="checkbox" data-action="toggle" data-id="${id}" ${on ? 'checked' : ''} />
-            <span class="enchant-name">${esc(name)}
-              <span class="badges">
-                <span class="badge" style="color:var(--aqua)" title="Multiplicateur de coût quand l'enchantement vient d'un livre">Livre ×${bookMult}</span>
-                <span class="badge" style="color:var(--muted)" title="Multiplicateur quand il vient d'un objet enchanté">Objet ×${itemMult}</span>
-                <span class="badge" style="color:var(--muted)">max ${roman[max]}</span>
-              </span>
-            </span>
-          </label>
-          <div class="stepper">
-            <button data-action="level" data-id="${id}" data-delta="-1" ${!on || lvl <= 1 ? 'disabled' : ''} aria-label="Niveau moins">−</button>
-            <output>${on ? roman[lvl] : '—'}</output>
-            <button data-action="level" data-id="${id}" data-delta="1" ${!on || lvl >= max ? 'disabled' : ''} aria-label="Niveau plus">+</button>
-          </div>
-        </div>`;
-    }).join('');
+    const kit = kitOf(c);
+    const inKit = kitIds(c);
+    const others = c.enchants.filter((id) => !inKit.includes(id));
+    const kitRows = inKit.map(enchantRow).join('');
+    const otherRows = others.map(enchantRow).join('');
 
     let resultHtml = '';
     if (state.result) {
@@ -126,9 +143,23 @@
       <button class="back" data-action="back">← Équipements</button>
       <div class="cat-head">
         <img class="px" src="${ASSETS}/items/${c.icon}.png" alt="" />
-        <div><h2>${esc(c.name)}</h2><p>${c.enchants.length} enchantements · ${c.group}</p></div>
+        <div><h2>${esc(c.name)}</h2><p>${c.group} · le meilleur kit est présélectionné</p></div>
       </div>
-      <section class="panel" style="margin-top:12px">${rows}</section>
+      <section class="panel" style="margin-top:12px">
+        <div class="kit-head">
+          <div class="kit-title">★ Meilleur kit</div>
+          <button class="btn ghost small" data-action="reset-kit">Remettre le kit</button>
+        </div>
+        ${kit.note ? `<div class="notice warn" style="margin:0 0 6px">${esc(kit.note)}</div>` : ''}
+        ${kitRows}
+      </section>
+      ${others.length ? `
+        <section class="panel" style="margin-top:12px">
+          <button class="more-btn" data-action="toggle-others" aria-expanded="${state.showOthers}">
+            Autres enchantements (${others.length}) <span>${state.showOthers ? '▴' : '▾'}</span>
+          </button>
+          ${state.showOthers ? otherRows : ''}
+        </section>` : ''}
       <div class="cta">
         <span class="count">${selCount} sélectionné${selCount > 1 ? 's' : ''}</span>
         <button class="btn" data-action="calc" ${selCount < 2 ? 'disabled' : ''}>Ordre optimal</button>
@@ -250,11 +281,48 @@
     catch (e) { console.error(e); }
   }
 
+  // ---------- Minerais ----------
+  const fmtY = (n) => `y ${n < 0 ? '−' + (-n) : n}`;
+  const AXES = { overworld: [-64, 320], nether: [0, 128] };
+
+  function oreCard(o) {
+    const [lo, hi] = AXES[o.dim];
+    const pct = (y) => Math.max(0, Math.min(100, ((y - lo) / (hi - lo)) * 100));
+    const best = o.best.length ? o.best.map(fmtY).join(' · ') : 'uniforme';
+    return `
+      <article class="ore-card">
+        <img class="px" src="${ASSETS}/items/${o.icon}.png" alt="" />
+        <div class="ore-main">
+          <div class="ore-top"><strong>${esc(o.name)}</strong><span class="ore-y${o.best.length ? '' : ' flat'}">${best}</span></div>
+          <div class="ore-range">Génération de ${fmtY(o.range[0])} à ${fmtY(o.range[1])}</div>
+          <div class="ybar" role="img" aria-label="Plage ${fmtY(o.range[0])} à ${fmtY(o.range[1])}">
+            <span class="band" style="left:${pct(o.range[0])}%;width:${Math.max(1.5, pct(o.range[1]) - pct(o.range[0]))}%"></span>
+            ${o.best.map((y) => `<span class="mark" style="left:${pct(y)}%"></span>`).join('')}
+          </div>
+          <p class="ore-note">${esc(o.note)}</p>
+        </div>
+      </article>`;
+  }
+
+  function renderOres() {
+    const section = (dim, title, axis) => `
+      <h2 class="section">${title}</h2>
+      <div class="axis"><span>${fmtY(axis[0])}</span><span>hauteur (Y)</span><span>${fmtY(axis[1])}</span></div>
+      ${DATA.ORES.filter((o) => o.dim === dim).map(oreCard).join('')}`;
+    return `
+      <p class="hint" style="margin:6px 2px 0">Hauteur où chaque minerai est le plus fréquent (Java 1.18+). Appuie sur <b>F3</b> en jeu pour voir ta hauteur Y. Le point jaune marque le meilleur niveau, la barre la plage de génération.</p>
+      ${section('overworld', 'Overworld', AXES.overworld)}
+      ${section('nether', 'Nether', AXES.nether)}
+      <p class="disclaimer">Source : minecraft.wiki (« Ore (feature) », « Amethyst Geode »). Le meilleur niveau est le pic de la distribution ; en pratique les grottes, la lave et le relief changent ce qui est visible.</p>`;
+  }
+
   // ---------- Rendu global ----------
   function render() {
     if (state.tab === 'enchant') {
       const c = state.cat ? cat(state.cat) : null;
       APP.innerHTML = c ? renderCategory(c) : renderHome();
+    } else if (state.tab === 'ores') {
+      APP.innerHTML = renderOres();
     } else {
       APP.innerHTML = renderTrims();
       attachStand();
@@ -276,13 +344,18 @@
       return;
     }
 
-    if (a === 'open-cat') { state.cat = el.dataset.id; state.sel = {}; state.result = null; }
+    if (a === 'open-cat') {
+      state.cat = el.dataset.id; state.showOthers = false;
+      state.sel = kitSelection(cat(state.cat)); recalc();
+    }
     else if (a === 'back') { state.cat = null; state.sel = {}; state.result = null; }
+    else if (a === 'reset-kit') { state.sel = kitSelection(cat(state.cat)); recalc(); }
+    else if (a === 'toggle-others') { state.showOthers = !state.showOthers; }
     else if (a === 'level') {
       const id = el.dataset.id;
       const max = DATA.ENCHANTS[id][1];
       const next = Math.min(max, Math.max(1, (state.sel[id] || max) + Number(el.dataset.delta)));
-      state.sel[id] = next; state.result = null;
+      state.sel[id] = next; recalc();
     }
     else if (a === 'calc') { calculate(); }
     else if (a === 'trim-piece') { state.trim.piece = el.dataset.v; saveTrim(); }
@@ -309,7 +382,7 @@
       const id = el.dataset.id;
       if (el.checked) state.sel[id] = DATA.ENCHANTS[id][1];
       else delete state.sel[id];
-      state.result = null;
+      recalc();
       render();
     }
   });
