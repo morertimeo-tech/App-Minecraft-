@@ -3,6 +3,7 @@
   const OPT = window.MC_OPT;
   const TRIMS = window.MC_TRIMS;
   const STAND = window.MC_STAND;
+  const TRADES = window.MC_TRADES;
   const APP = document.getElementById('app');
   const ASSETS = 'assets';
   const STORE_KEY = 'enchantlab.trims.v1';
@@ -32,6 +33,7 @@
     sel: {},         // { enchantId: level }
     result: null,    // résultat de l'optimiseur
     showOthers: false, // section « Autres enchantements » dépliée
+    trade: { prof: null, q: '' }, // onglet Échanges : profession ouverte, recherche
     trim: trimState,
   };
 
@@ -42,7 +44,13 @@
   // ---------- Onglets ----------
   function setTab(tab) {
     state.tab = tab;
-    document.querySelectorAll('.tab').forEach((b) => b.setAttribute('aria-selected', String(b.dataset.tab === tab)));
+    APP.addEventListener('input', (e) => {
+    if (e.target.id !== 'trade-q') return;
+    state.trade.q = e.target.value;
+    document.getElementById('trade-body').innerHTML = tradeBody();
+  });
+
+  document.querySelectorAll('.tab').forEach((b) => b.setAttribute('aria-selected', String(b.dataset.tab === tab)));
     state.cat = null; state.result = null;
     render();
     window.scrollTo({ top: 0 });
@@ -281,6 +289,76 @@
     catch (e) { console.error(e); }
   }
 
+  // ---------- Échanges des villageois ----------
+  const norm = (t) => String(t).normalize('NFD').replace(/[̀-ͯ]/g, '').toLowerCase();
+
+  function slot(it) {
+    const img = it.icon
+      ? `<img class="px" src="${ASSETS}/trade-icons/${it.icon}.png" alt="" />`
+      : '<span class="noicon">?</span>';
+    return `<span class="slot${it.ench ? ' ench' : ''}" title="${esc(it.name)}">${img}${it.n !== '1' ? `<b class="cnt">${esc(it.n)}</b>` : ''}</span>`;
+  }
+  const itemsText = (list) => list.map((x) => `${x.n !== '1' ? x.n + ' × ' : ''}${x.name}`).join(' + ');
+
+  function tradeRow(t) {
+    return `
+      <div class="trade">
+        <div class="tline">${t.wants.map(slot).join('<i>+</i>')}<i class="arr">→</i>${t.gives.map(slot).join('<i>+</i>')}</div>
+        <div class="tname">${esc(itemsText(t.wants))} <span>→</span> ${esc(itemsText(t.gives))}</div>
+        <div class="tmeta"><span>Chance ${esc(t.p)}</span><span>Stock ${esc(t.stock)}</span>${t.xp ? `<span>${esc(t.xp)} XP</span>` : ''}</div>
+        ${(t.notes || []).map((n) => `<p class="tnote">ℹ ${esc(n)}</p>`).join('')}
+      </div>`;
+  }
+
+  function levelBlock(lv) {
+    const xp = lv.xpNeeded != null ? `<small>${lv.xpNeeded} XP de villageois requis</small>` : '';
+    return `<h3 class="lvl">${esc(lv.name)} ${xp}</h3>${lv.trades.map(tradeRow).join('')}`;
+  }
+
+  function tradeBody() {
+    const { prof, q } = state.trade;
+    if (q.trim()) {
+      const nq = norm(q.trim());
+      let count = 0; let html = '';
+      for (const p of TRADES) for (const lv of p.levels) {
+        const hits = lv.trades.filter((t) => [...t.wants, ...t.gives].some((x) => norm(x.name).includes(nq)));
+        if (!hits.length) continue;
+        count += hits.length;
+        html += `<h3 class="lvl">${esc(p.name)} · ${esc(lv.name)}</h3>${hits.map(tradeRow).join('')}`;
+      }
+      return count
+        ? `<p class="hint">${count} échange${count > 1 ? 's' : ''} avec « ${esc(q.trim())} »</p>${html}`
+        : `<div class="notice warn">Aucun échange ne contient « ${esc(q.trim())} ».</div>`;
+    }
+    if (prof) {
+      const p = TRADES.find((x) => x.id === prof);
+      const n = p.levels.reduce((a, l) => a + l.trades.length, 0);
+      return `
+        <button class="back" data-action="trade-back">← Professions</button>
+        <div class="cat-head">
+          ${p.icon ? `<img class="px" src="${ASSETS}/trade-icons/${p.icon}.png" alt="" />` : ''}
+          <div><h2>${esc(p.name)}</h2><p>${n} échanges</p></div>
+        </div>
+        ${p.levels.map(levelBlock).join('')}`;
+    }
+    return `
+      <div class="grid">
+        ${TRADES.map((p) => `
+          <button class="tile" data-action="trade-open" data-id="${p.id}">
+            ${p.icon ? `<img class="px" src="${ASSETS}/trade-icons/${p.icon}.png" alt="" />` : ''}
+            <span>${esc(p.name)}</span>
+            <small>${p.levels.reduce((a, l) => a + l.trades.length, 0)} échanges</small>
+          </button>`).join('')}
+      </div>
+      <p class="disclaimer">Source : minecraft.wiki (« Trading »), Java Edition. « Chance » = probabilité que l'échange soit proposé. Les noms français sont à vérifier ; certains objets récents n'ont pas d'icône (?).</p>`;
+  }
+
+  function renderTrades() {
+    return `
+      <input id="trade-q" class="search" type="search" inputmode="search" placeholder="Chercher un objet (diamant, livre…)" value="${esc(state.trade.q)}" autocomplete="off" />
+      <div id="trade-body">${tradeBody()}</div>`;
+  }
+
   // ---------- Minerais ----------
   const fmtY = (n) => `y ${n < 0 ? '−' + (-n) : n}`;
   const AXES = { overworld: [-64, 320], nether: [0, 128] };
@@ -321,6 +399,8 @@
     if (state.tab === 'enchant') {
       const c = state.cat ? cat(state.cat) : null;
       APP.innerHTML = c ? renderCategory(c) : renderHome();
+    } else if (state.tab === 'trades') {
+      APP.innerHTML = renderTrades();
     } else if (state.tab === 'ores') {
       APP.innerHTML = renderOres();
     } else {
@@ -349,6 +429,8 @@
       state.sel = kitSelection(cat(state.cat)); recalc();
     }
     else if (a === 'back') { state.cat = null; state.sel = {}; state.result = null; }
+    else if (a === 'trade-open') { state.trade.prof = el.dataset.id; window.scrollTo({ top: 0 }); }
+    else if (a === 'trade-back') { state.trade.prof = null; window.scrollTo({ top: 0 }); }
     else if (a === 'reset-kit') { state.sel = kitSelection(cat(state.cat)); recalc(); }
     else if (a === 'toggle-others') { state.showOthers = !state.showOthers; }
     else if (a === 'level') {

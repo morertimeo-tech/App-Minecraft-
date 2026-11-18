@@ -5,6 +5,9 @@ Application web mobile (HTML/CSS/JS, sans build) avec :
 1. **Enchantements** : une catégorie par équipement (casque, plastron, jambières, bottes, épée, lance, masse, hache, pioche, pelle, houe, arc, arbalète, trident, canne à pêche, élytres, cisailles). Tu coches les enchantements voulus, tu choisis leur niveau, et l'app calcule l'ordre d'enclume le moins cher.
 2. **Trims d'armure** : pour chaque pièce, choix de la matière (cuir, maille, cuivre, fer, or, diamant, netherite), couleur de teinture du cuir, motif et matière de trim (11 couleurs). Rendu avec les vraies textures du jeu, dont un **porte-armure 3D** (glisse pour tourner) qui montre les motifs de trim comme en jeu.
 
+3. **Minerais** : meilleur niveau Y et plage de génération de chaque minerai (Overworld et Nether).
+4. **Échanges** : tous les échanges des 13 professions de villageois et du colporteur (283 échanges, par niveau), avec recherche d'un objet dans toutes les professions.
+
 ## Lancer l'app
 
 Il faut un serveur HTTP (le rendu des trims lit les pixels, ce qui est bloqué en `file://`) :
@@ -23,6 +26,8 @@ js/data.js            enchantements, catégories, incompatibilités, matières, 
 js/optimizer.js       calcul de l'ordre optimal (programmation dynamique)
 js/trims.js           composition des armures (teinture + recoloration du trim)
 js/stand.js           porte-armure 3D (three.js, dans vendor/)
+js/trades-data.js     échanges des villageois (généré, ne pas éditer à la main)
+tools/                scripts qui extraient les échanges du wiki et génèrent js/trades-data.js
 js/app.js             interface
 assets/               textures copiées du jeu (Minecraft 26.1, via PrismarineJS/minecraft-assets)
 tests/optimizer.test.js   tests de l'optimiseur (node tests/optimizer.test.js)
@@ -42,7 +47,20 @@ tests/optimizer.test.js   tests de l'optimiseur (node tests/optimizer.test.js)
 - L'optimiseur est comparé à une recherche exhaustive indépendante (jusqu'à 5 enchantements) : mêmes résultats.
 - Niveaux max, objets applicables et incompatibilités viennent des pages « Enchanting » et « Anvil mechanics » (consultées le 18/11/2026).
 
+## Régénérer les échanges des villageois
+
+```bash
+# 1. Télécharger la page du wiki (lecture seule, ne pas exécuter)
+curl -L https://minecraft.wiki/w/Trading -o Trading.html
+# 2. Extraire puis construire (voir l'en-tête de chaque script)
+python3 -I tools/extract_trades.py Trading.html trades.json
+python3 -I tools/build_trades.py trades.json <dossier assets 26.1> .
+```
+
 ## Limites connues
+
+- **Échanges** : Java Edition. Le wiki liste parfois du contenu plus récent que mes textures (version 26.1) : bûche et pousse de peuplier, pointe de soufre, bannières, lit et bouclier n'ont pas d'icône (affichés « ? »). Les noms français des objets sont écrits de mémoire, surtout pour les nouveautés.
+- **Minerais** : le « meilleur niveau » est le pic théorique de la distribution ; les mesures réelles du wiki diffèrent parfois (ex. émeraude).
 
 - **Java Edition uniquement.** Bedrock calcule le coût différemment (différence de niveaux au lieu du niveau final).
 - **Noms français** des enchantements écrits de mémoire (le wiki consulté est en anglais) : quelques-uns peuvent différer de la traduction officielle.

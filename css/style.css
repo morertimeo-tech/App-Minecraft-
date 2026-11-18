@@ -277,3 +277,28 @@ h2.section {
 .ore-note { margin: 4px 0 0; font-size: 12.5px; color: var(--text); opacity: .9; }
 
 .steps .cost { margin-left: 8px; }
+
+/* ---------- Échanges des villageois ---------- */
+.tab span { font-size: 11px; }
+.tab { padding: 6px 4px; }
+.search { width: 100%; padding: 12px 14px; margin: 4px 0 12px; font: inherit; font-size: 15px; color: var(--text);
+  background: #1d1830; border: 2px solid #120e1d; border-radius: 12px; box-shadow: inset 0 2px 0 rgba(0,0,0,.35); }
+.search:focus { outline: none; border-color: var(--gold); }
+h3.lvl { font-family: "Press Start 2P", monospace; font-weight: 400; font-size: 11px; color: var(--gold); margin: 20px 2px 8px; text-shadow: 1px 1px 0 #000; }
+h3.lvl small { font-family: system-ui, sans-serif; font-size: 11px; color: var(--muted); text-shadow: none; margin-left: 6px; }
+.trade { padding: 10px 12px; margin-bottom: 8px; background: linear-gradient(180deg, var(--panel-2), var(--panel));
+  border: 2px solid #15102a; border-radius: 12px; box-shadow: inset 0 2px 0 rgba(255,255,255,.05); }
+.tline { display: flex; align-items: center; gap: 6px; flex-wrap: wrap; }
+.tline i { font-style: normal; color: var(--muted); font-weight: 700; }
+.tline i.arr { color: var(--gold); font-size: 18px; margin: 0 4px; }
+.slot { position: relative; display: inline-grid; place-items: center; width: 44px; height: 44px; flex: none;
+  background: #1a1528; border: 2px solid #0c0916; border-radius: 8px; box-shadow: inset 0 2px 0 rgba(0,0,0,.4); }
+.slot img { width: 30px; height: 30px; image-rendering: pixelated; }
+.slot .noicon { font-family: "Press Start 2P", monospace; color: var(--muted); font-size: 14px; }
+.slot .cnt { position: absolute; right: 2px; bottom: 0; font-family: "Press Start 2P", monospace; font-weight: 400; font-size: 9px; color: #fff; text-shadow: 1px 1px 0 #000; }
+.slot.ench { border-color: #8a4bff; box-shadow: inset 0 0 8px rgba(177,108,255,.65), 0 0 6px rgba(177,108,255,.4); }
+.tname { margin-top: 6px; font-size: 13.5px; font-weight: 600; }
+.tname span { color: var(--gold); }
+.tmeta { display: flex; flex-wrap: wrap; gap: 6px; margin-top: 6px; }
+.tmeta span { font-size: 11.5px; padding: 1px 8px; border-radius: 999px; background: #1d1830; border: 1px solid #120e1d; color: var(--muted); }
+.tnote { margin: 6px 0 0; font-size: 12px; color: #c9bff0; opacity: .9; }
