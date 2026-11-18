@@ -2,6 +2,7 @@
   const DATA = window.MC_DATA;
   const OPT = window.MC_OPT;
   const TRIMS = window.MC_TRIMS;
+  const STAND = window.MC_STAND;
   const APP = document.getElementById('app');
   const ASSETS = 'assets';
   const STORE_KEY = 'enchantlab.trims.v1';
@@ -169,7 +170,15 @@
       s.trim === t.id)).join('');
 
     return `
-      <div class="piece-tabs" role="tablist">
+      <section class="panel stand-panel">
+        <div id="stand-slot"></div>
+        <div class="stand-bar">
+          <button class="btn ghost" data-action="stand-spin">${standViewer && standViewer.auto ? 'Arrêter la rotation' : 'Rotation auto'}</button>
+          <span class="hint">Glisse pour tourner le porte-armure</span>
+        </div>
+      </section>
+
+      <div class="piece-tabs" role="tablist" style="margin-top:14px">
         ${DATA.ARMOR_PIECES.map((p) => `
           <button class="piece-tab" role="tab" data-action="trim-piece" data-v="${p.id}" aria-selected="${p.id === piece}">
             <canvas data-draw="${p.id}" width="16" height="16"></canvas>${esc(p.name)}
@@ -212,6 +221,24 @@
       </section>`;
   }
 
+  // Le viewer 3D est créé une fois puis ré-attaché après chaque rendu de l'écran.
+  let standViewer = null;
+  let standFailed = false;
+  function attachStand() {
+    const slot = APP.querySelector('#stand-slot');
+    if (!slot || standFailed) return;
+    try {
+      if (!standViewer) standViewer = STAND.createStand(window.THREE, TRIMS, { assetsDir: ASSETS, dyeHex });
+    } catch (e) {
+      standFailed = true;
+      slot.innerHTML = '<p class="hint" style="padding:16px">La vue 3D nécessite WebGL, indisponible sur cet appareil.</p>';
+      return;
+    }
+    slot.appendChild(standViewer.el);
+    standViewer.resize();
+    standViewer.update(state.trim.settings).catch((e) => console.error(e));
+  }
+
   async function drawTrimCanvases() {
     const ts = state.trim.settings;
     const draw = (sel, p) => {
@@ -237,6 +264,7 @@
       APP.innerHTML = c ? renderCategory(c) : renderHome();
     } else {
       APP.innerHTML = renderTrims();
+      attachStand();
       drawTrimCanvases();
     }
   }
@@ -247,6 +275,13 @@
     if (!el || el.disabled) return;
     const a = el.dataset.action;
     if (a === 'toggle') return; // géré par 'change' : évite un re-rendu pendant le clic
+    if (a === 'stand-spin') {
+      if (standViewer) {
+        standViewer.setAuto(!standViewer.auto);
+        el.textContent = standViewer.auto ? 'Arrêter la rotation' : 'Rotation auto';
+      }
+      return;
+    }
 
     if (a === 'open-cat') { state.cat = el.dataset.id; state.sel = {}; state.result = null; }
     else if (a === 'back') { state.cat = null; state.sel = {}; state.result = null; }

@@ -3,7 +3,7 @@
 Application web mobile (HTML/CSS/JS, sans build) avec :
 
 1. **Enchantements** : une catégorie par équipement (casque, plastron, jambières, bottes, épée, lance, masse, hache, pioche, pelle, houe, arc, arbalète, trident, canne à pêche, élytres, cisailles). Tu coches les enchantements voulus, tu choisis leur niveau, et l'app calcule l'ordre d'enclume le moins cher.
-2. **Trims d'armure** : pour chaque pièce, choix de la matière (cuir, maille, cuivre, fer, or, diamant, netherite), couleur de teinture du cuir, motif et matière de trim (11 couleurs). Rendu avec les vraies textures du jeu.
+2. **Trims d'armure** : pour chaque pièce, choix de la matière (cuir, maille, cuivre, fer, or, diamant, netherite), couleur de teinture du cuir, motif et matière de trim (11 couleurs). Rendu avec les vraies textures du jeu, dont un **porte-armure 3D** (glisse pour tourner) qui montre les motifs de trim comme en jeu.
 
 ## Lancer l'app
 
@@ -22,6 +22,7 @@ css/style.css         thème sombre, cartes façon inventaire
 js/data.js            enchantements, catégories, incompatibilités, matières, motifs, couleurs
 js/optimizer.js       calcul de l'ordre optimal (programmation dynamique)
 js/trims.js           composition des armures (teinture + recoloration du trim)
+js/stand.js           porte-armure 3D (three.js, dans vendor/)
 js/app.js             interface
 assets/               textures copiées du jeu (Minecraft 26.1, via PrismarineJS/minecraft-assets)
 tests/optimizer.test.js   tests de l'optimiseur (node tests/optimizer.test.js)
@@ -48,7 +49,8 @@ tests/optimizer.test.js   tests de l'optimiseur (node tests/optimizer.test.js)
 - **Pas de bouclier** : sa texture n'est pas dans le pack d'assets utilisé.
 - **Un seul objet à enchanter, uniquement des livres en sacrifice.** Pas de fusion de deux objets enchantés, ni de réparation, ni de renommage (qui ajoutent des coûts en jeu).
 - **Un livre par enchantement, au niveau voulu.** Le coût d'obtention des livres n'est pas compté, ni la montée de niveau par fusion de deux livres identiques.
-- **Trims** : l'icône d'inventaire ne montre pas le motif (visible seulement sur le modèle 3D). Le motif est affiché à part via son template.
+- **Trims** : l'icône d'inventaire ne montre pas le motif (visible seulement sur le modèle 3D). Le motif est visible sur le porte-armure 3D.
+- **Porte-armure** : modèle avec bras, pose par défaut du jeu ; l'éclairage est une approximation (pas le shader du jeu).
 - Textures de la version 26.1 du jeu ; d'autres versions peuvent différer légèrement.
 
 ## Prochaines étapes possibles

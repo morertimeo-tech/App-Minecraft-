@@ -53,6 +53,79 @@
     return out;
   }
 
+  // Le jeu utilise la palette « darker » si la matière du trim est celle de l'armure.
+  const SAME_MATERIAL = { iron: 'iron', golden: 'gold', diamond: 'diamond', netherite: 'netherite', copper: 'copper' };
+  function paletteName(s) {
+    return SAME_MATERIAL[s.material] === s.trim ? `${s.trim}_darker` : s.trim;
+  }
+
+  // Recolore une image de trim en niveaux de gris avec une palette de 8 couleurs.
+  async function recolorTrim(img, w, h, dir, paletteId) {
+    const [trimPal, mat] = await Promise.all([
+      loadImage(`${dir}/trims/palettes/trim_palette.png`),
+      loadImage(`${dir}/trims/palettes/${paletteId}.png`),
+    ]);
+    const grey = readPalette(trimPal);
+    const colours = readPalette(mat);
+    const mc = makeCanvas(w, h);
+    const mctx = mc.getContext('2d');
+    mctx.drawImage(img, 0, 0, w, h);
+    const data = mctx.getImageData(0, 0, w, h);
+    const d = data.data;
+    for (let i = 0; i < d.length; i += 4) {
+      if (d[i + 3] === 0) continue;
+      let best = 0, bestDist = Infinity;
+      for (let j = 0; j < grey.length; j++) {
+        const dist = Math.abs(grey[j][0] - d[i]);
+        if (dist < bestDist) { bestDist = dist; best = j; }
+      }
+      d[i] = colours[best][0]; d[i + 1] = colours[best][1]; d[i + 2] = colours[best][2];
+    }
+    mctx.putImageData(data, 0, 0);
+    return mc;
+  }
+
+  // Teinte une image (multiply par la couleur, en gardant sa transparence).
+  function tint(img, w, h, hex) {
+    const c = makeCanvas(w, h);
+    const t = c.getContext('2d');
+    t.imageSmoothingEnabled = false;
+    t.drawImage(img, 0, 0, w, h);
+    t.globalCompositeOperation = 'multiply';
+    t.fillStyle = hex;
+    t.fillRect(0, 0, w, h);
+    t.globalCompositeOperation = 'destination-in';
+    t.drawImage(img, 0, 0, w, h);
+    return c;
+  }
+
+  /** Texture 64×32 de l'armure portée (couche 'layer1' ou 'layer2' pour les jambières). */
+  async function wornCanvas(layer, s, opts) {
+    const dir = (opts && opts.assetsDir) || 'assets';
+    const file = s.material === 'golden' ? 'gold' : s.material;
+    const base = await loadImage(`${dir}/worn/${layer}/${file}.png`);
+    const c = makeCanvas(64, 32);
+    const ctx = c.getContext('2d');
+    ctx.imageSmoothingEnabled = false;
+    if (s.material === 'leather') {
+      // Comme dans le jeu : la couche de base est teintée, l'overlay (boucles…) ne l'est pas.
+      ctx.drawImage(tint(base, 64, 32, (opts && opts.dyeHex) || '#a06540'), 0, 0);
+      const ov = await loadImage(`${dir}/worn/${layer}/leather_overlay.png`);
+      ctx.drawImage(ov, 0, 0);
+    } else {
+      ctx.drawImage(base, 0, 0);
+    }
+    return c;
+  }
+
+  /** Texture 64×32 du trim porté, recolorée ; null si pas de trim. */
+  async function trimCanvas(layer, s, opts) {
+    if (!s.trim || !s.pattern) return null;
+    const dir = (opts && opts.assetsDir) || 'assets';
+    const img = await loadImage(`${dir}/trims/entity/${layer}/${s.pattern}.png`);
+    return recolorTrim(img, 64, 32, dir, paletteName(s));
+  }
+
   /**
    * Dessine une armure 16×16 dans un canvas.
    * @param {HTMLCanvasElement} canvas
@@ -68,26 +141,19 @@
     ctx.imageSmoothingEnabled = false;
 
     const base = await loadImage(`${dir}/items/${s.material}_${s.piece}.png`);
-    ctx.drawImage(base, 0, 0, 16, 16);
-
     if (s.material === 'leather') {
+      ctx.drawImage(tint(base, 16, 16, dyeHex), 0, 0);
       const ov = await loadImage(`${dir}/items/leather_${s.piece}_overlay.png`);
-      const tmp = makeCanvas(16, 16);
-      const tctx = tmp.getContext('2d');
-      tctx.drawImage(ov, 0, 0, 16, 16);
-      tctx.globalCompositeOperation = 'multiply';
-      tctx.fillStyle = dyeHex;
-      tctx.fillRect(0, 0, 16, 16);
-      tctx.globalCompositeOperation = 'destination-in';
-      tctx.drawImage(ov, 0, 0, 16, 16);
-      ctx.drawImage(tmp, 0, 0);
+      ctx.drawImage(ov, 0, 0, 16, 16);
+    } else {
+      ctx.drawImage(base, 0, 0, 16, 16);
     }
 
     if (s.trim && s.pattern) {
       const [mask, trimPal, mat] = await Promise.all([
         loadImage(`${dir}/trims/${s.piece}_trim.png`),
         loadImage(`${dir}/trims/palettes/trim_palette.png`),
-        loadImage(`${dir}/trims/palettes/${s.trim}.png`),
+        loadImage(`${dir}/trims/palettes/${paletteName(s)}.png`),
       ]);
       const grey = readPalette(trimPal);   // niveaux de gris de référence
       const colours = readPalette(mat);    // couleurs de la matière de trim
@@ -124,5 +190,5 @@
     });
   }
 
-  return { drawArmor, drawTemplate, loadImage, readPalette, hexToRgb };
+  return { drawArmor, drawTemplate, loadImage, readPalette, hexToRgb, wornCanvas, trimCanvas, paletteName };
 });
