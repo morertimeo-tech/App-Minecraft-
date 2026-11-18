@@ -1,39 +1,93 @@
 const assert = require('assert');
-const { optimize } = require('../js/optimizer.js');
+const { optimize, penalty } = require('../js/optimizer.js');
 const DATA = require('../js/data.js');
 
-const mult = (id) => DATA.RARITY[DATA.ENCHANTS[id][2]].mult;
-const chainCost = (list) => list.reduce((acc, e, i) => acc + mult(e.id) * e.level + (2 ** i - 1), 0);
-const perms = (arr) => arr.length <= 1 ? [arr] : arr.flatMap((x, i) => perms([...arr.slice(0, i), ...arr.slice(i + 1)]).map((p) => [x, ...p]));
+const bookMult = (id) => DATA.ENCHANTS[id][3];
+const value = (list) => list.reduce((a, e) => a + e.level * bookMult(e.id), 0);
+const E = (id, level) => ({ id, level });
 
-// 1. Un seul enchantement : coût = multiplicateur × niveau, pas de pénalité
-let r = optimize([{ id: 'sharpness', level: 5 }]);
-assert.ok(r.ok); assert.strictEqual(r.total, 5); assert.strictEqual(r.steps.length, 0 + r.steps.length);
+// ---- 1. Exemples chiffrés du wiki (minecraft.wiki « Anvil mechanics »), bottes à 7 enchantements
+const SS = E('soul_speed', 3), TH = E('thorns', 3), FF = E('feather_falling', 4), DS = E('depth_strider', 3);
+const PR = E('protection', 4), UB = E('unbreaking', 3), MD = E('mending', 1);
+// valeurs de livre données par le wiki : 12, 12, 4, 6, 4, 3, 2
+assert.deepStrictEqual([SS, TH, FF, DS, PR, UB, MD].map((e) => value([e])), [12, 12, 4, 6, 4, 3, 2]);
 
-// 2. Incompatibles : Tranchant + Châtiment
-r = optimize([{ id: 'sharpness', level: 5 }, { id: 'smite', level: 5 }]);
-assert.strictEqual(r.ok, false);
+const op = (sacrifice, ka, kb) => value(sacrifice) + penalty(ka) + penalty(kb);
+// Plan 1 (wiki : 22 + 25 + 21 = 68)
+const p1r1 = op([SS], 0, 0) + op([FF], 0, 0) + op([PR], 0, 0) + op([MD], 0, 0);
+const p1r2 = op([TH, FF], 1, 1) + op([UB, MD], 1, 1);
+const p1r3 = op([DS, PR, UB, MD], 2, 2);
+assert.deepStrictEqual([p1r1, p1r2, p1r3], [22, 25, 21]);
+assert.strictEqual(p1r1 + p1r2 + p1r3, 68);
+// Plan 2 (wiki : 21 + 16 + 14 + 15 = 66)
+const p2 = op([SS], 0, 0) + op([MD], 0, 0) + op([FF], 0, 0) + op([UB], 0, 0)
+  + op([TH, MD], 1, 1) + op([DS, FF], 2, 1) + op([PR, UB], 3, 1);
+assert.strictEqual(p2, 66);
 
-// 3. Niveau hors limite
-r = optimize([{ id: 'mending', level: 2 }]);
-assert.strictEqual(r.ok, false);
+// L'optimiseur doit faire au moins aussi bien que le plan 2 du wiki (66)
+const boots = optimize([SS, TH, FF, DS, PR, UB, MD]);
+assert.ok(boots.ok);
+console.log(`Bottes 7 enchantements : optimal=${boots.total} (wiki cite 66, ordre naïf=${boots.naive})`);
+assert.ok(boots.total <= 66, `optimal ${boots.total} > 66`);
+assert.ok(boots.steps.every((s) => s.cost <= 39), 'une étape dépasse 39 niveaux');
+assert.strictEqual(boots.steps.reduce((a, s) => a + s.cost, 0), boots.total);
 
-// 4. Somme des étapes = total, et total ≤ meilleur ordre de chaîne (propriété)
-const pool = [
-  { id: 'sharpness', level: 5 }, { id: 'unbreaking', level: 3 }, { id: 'mending', level: 1 },
-  { id: 'looting', level: 3 }, { id: 'fire_aspect', level: 2 }, { id: 'knockback', level: 2 },
-];
-const sample = [
-  pool.slice(0, 2), pool.slice(0, 3), pool.slice(0, 4), pool.slice(0, 5), pool,
-];
-for (const set of sample) {
-  const res = optimize(set);
-  assert.ok(res.ok, JSON.stringify(res));
-  const sum = res.steps.reduce((a, s) => a + s.cost, 0);
-  assert.strictEqual(sum, res.total, 'somme des étapes ≠ total');
-  const bestChain = Math.min(...perms(set).map(chainCost));
-  assert.strictEqual(res.naive, chainCost(set));
-  assert.ok(res.total <= bestChain, `optimal ${res.total} > meilleur ordre de chaîne ${bestChain}`);
-  console.log(`n=${set.length} optimal=${res.total} naïf(donné)=${res.naive} meilleur ordre chaîne=${bestChain}`);
+// ---- 2. Livre Âme (1er) puis Raccommodage vs ordre inverse : 2 vs 12 (wiki)
+assert.strictEqual(op([MD], 0, 0), 2);
+assert.strictEqual(op([SS], 0, 0), 12);
+
+// ---- 3. Cas simples et erreurs
+let r = optimize([E('sharpness', 5)]);
+assert.ok(r.ok); assert.strictEqual(r.total, 5); assert.strictEqual(r.steps.length, 1);
+assert.strictEqual(optimize([E('sharpness', 5), E('smite', 5)]).ok, false);
+assert.strictEqual(optimize([E('sharpness', 5), E('breach', 4)]).ok, false); // Brèche ↔ Tranchant
+assert.strictEqual(optimize([E('mending', 2)]).ok, false);
+assert.strictEqual(optimize([E('mending', 1), E('infinity', 1)]).ok, false);
+
+// ---- 4. Recherche exhaustive indépendante (n ≤ 5) : DP == brute force
+function brute(input, cap) {
+  const n = input.length;
+  const conflicts = (a, b) => DATA.CONFLICT_GROUPS.some((g) => g.includes(input[a].id) && g.includes(input[b].id));
+  const ok = (mask) => {
+    for (let i = 0; i < n; i++) for (let j = i + 1; j < n; j++) {
+      if (mask & (1 << i) && mask & (1 << j) && conflicts(i, j)) return false;
+    }
+    return true;
+  };
+  const sub = (mask) => input.filter((_, i) => mask & (1 << i)).reduce((a, e) => a + e.level * bookMult(e.id), 0);
+  let best = Infinity;
+  const rec = (objs, cost) => {
+    if (cost >= best) return;
+    if (objs.length === 1) { if (objs[0].item && objs[0].mask === (1 << n) - 1) best = cost; return; }
+    for (let t = 0; t < objs.length; t++) for (let s = 0; s < objs.length; s++) {
+      if (t === s) continue;
+      const T = objs[t], S = objs[s];
+      if (S.item) continue;           // le sacrifié est toujours un livre
+      if (T.mask & S.mask) continue;
+      const mask = T.mask | S.mask;
+      if (!ok(mask)) continue;
+      const c = sub(S.mask) + penalty(T.k) + penalty(S.k);
+      if (c > cap) continue;
+      const rest = objs.filter((_, i) => i !== t && i !== s);
+      rec([...rest, { mask, k: Math.max(T.k, S.k) + 1, item: T.item }], cost + c);
+    }
+  };
+  rec([{ mask: 0, k: 0, item: true }, ...input.map((_, i) => ({ mask: 1 << i, k: 0, item: false }))], 0);
+  return best;
 }
+const pool = [E('sharpness', 5), E('unbreaking', 3), E('mending', 1), E('looting', 3), E('fire_aspect', 2), E('knockback', 2)];
+for (let n = 1; n <= 5; n++) {
+  const set = pool.slice(0, n);
+  const res = optimize(set);
+  const bf = brute(set, 39);
+  assert.strictEqual(res.total, bf, `n=${n} DP ${res.total} ≠ brute ${bf}`);
+  console.log(`n=${n} DP=${res.total} brute=${bf} naïf=${res.naive}`);
+}
+const bootSet = [SS, TH, FF, PR, UB]; // protection + 4 autres
+assert.strictEqual(optimize(bootSet).total, brute(bootSet, 39));
+
+// ---- 5. Plafond : tout dépasse 39 en Survie → flag overCap ; créatif sans plafond
+const heavy = [E('thorns', 3), E('soul_speed', 3), E('curse_binding', 1), E('swift_sneak', 3), E('silk_touch', 1)];
+r = optimize(heavy, { creative: true });
+assert.ok(r.ok && !r.overCap);
 console.log('OK : tous les tests passent');

@@ -58,7 +58,7 @@
             <button class="tile" data-action="open-cat" data-id="${c.id}">
               <img class="px" src="${ASSETS}/items/${c.icon}.png" alt="" />
               <span>${esc(c.name)}</span>
-              <small>${c.enchants.length} enchantements${c.verify ? ' · à vérifier' : ''}</small>
+              <small>${c.enchants.length} enchantements</small>
             </button>`).join('')}
         </div>`).join('')}`;
   }
@@ -67,8 +67,7 @@
   function renderCategory(c) {
     const selCount = Object.keys(state.sel).length;
     const rows = c.enchants.map((id) => {
-      const [name, max, rarity] = DATA.ENCHANTS[id];
-      const r = DATA.RARITY[rarity];
+      const [name, max, itemMult, bookMult] = DATA.ENCHANTS[id];
       const on = id in state.sel;
       const lvl = on ? state.sel[id] : max;
       return `
@@ -76,8 +75,11 @@
           <label>
             <input type="checkbox" data-action="toggle" data-id="${id}" ${on ? 'checked' : ''} />
             <span class="enchant-name">${esc(name)}
-              <span class="badge" style="color:${r.color}">${esc(r.label)} · ×${r.mult}</span>
-              <span class="badge" style="color:var(--muted)">max ${roman[max]}</span>
+              <span class="badges">
+                <span class="badge" style="color:var(--aqua)" title="Multiplicateur de coût quand l'enchantement vient d'un livre">Livre ×${bookMult}</span>
+                <span class="badge" style="color:var(--muted)" title="Multiplicateur quand il vient d'un objet enchanté">Objet ×${itemMult}</span>
+                <span class="badge" style="color:var(--muted)">max ${roman[max]}</span>
+              </span>
             </span>
           </label>
           <div class="stepper">
@@ -112,14 +114,12 @@
                   <span class="meta">→ ${esc(s.result)} · pénalité après : ${s.penaltyAfter}</span>
                 </li>`).join('')}
             </ol>
-            ${res.overCap ? `<div class="notice warn">Une étape coûte 40 niveaux ou plus : en Survie elle est refusée (« Trop cher »). Il faut la scinder ou passer en Créatif.</div>` : ''}
-            <p class="disclaimer">Calcul selon un modèle à vérifier en jeu (voir README). En cas d'écart, le jeu fait foi.</p>
+            ${res.overCap ? `<div class="notice warn">Aucun ordre ne garde chaque étape à 39 niveaux ou moins : en Survie l'enclume refuse (« Trop cher »). Ce plan n'est faisable qu'en Créatif, ou en retirant des enchantements.</div>` : ''}
+            ${!res.overCap && res.naiveOverCap ? `<div class="notice warn">Ajouter les livres un par un dépasserait 39 niveaux (« Trop cher »). L'ordre proposé évite ça.</div>` : ''}
+            <p class="disclaimer">Règles du wiki Minecraft (Java Edition). Sacrifié = livre ; livres combinables entre eux. Les coûts sont en niveaux d'expérience.</p>
           </div>`;
       }
     }
-
-    const verifyNote = c.verify
-      ? `<div class="notice warn">Liste d'enchantements de cet équipement à vérifier dans le jeu.</div>` : '';
 
     return `
       <button class="back" data-action="back">← Équipements</button>
@@ -127,7 +127,6 @@
         <img class="px" src="${ASSETS}/items/${c.icon}.png" alt="" />
         <div><h2>${esc(c.name)}</h2><p>${c.enchants.length} enchantements · ${c.group}</p></div>
       </div>
-      ${verifyNote}
       <section class="panel" style="margin-top:12px">${rows}</section>
       <div class="cta">
         <span class="count">${selCount} sélectionné${selCount > 1 ? 's' : ''}</span>

@@ -241,3 +241,5 @@ h2.section {
 @media (prefers-reduced-motion: reduce) {
   * { transition: none !important; }
 }
+
+.badges { display: flex; flex-wrap: wrap; gap: 4px; }
