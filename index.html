@@ -17,15 +17,20 @@
 </head>
 <body>
   <header class="topbar">
-    <img class="logo" src="assets/items/enchanted_book.png" alt="" />
-    <h1 class="brand">GRI<span>MOIRE</span></h1>
+    <a id="homeLink" class="homelink" href="#accueil" aria-label="Accueil">
+      <img class="logo" src="assets/items/enchanted_book.png" alt="" />
+      <h1 class="brand">GRI<span>MOIRE</span></h1>
+    </a>
     <span class="tagline">Guide de poche · Java</span>
   </header>
 
   <main id="app" class="screen" aria-live="polite"></main>
 
   <nav class="tabbar" aria-label="Sections">
-    <button class="tab" data-tab="enchant" aria-selected="true">
+    <button class="tab" data-tab="home" aria-selected="true">
+      <img src="assets/item-icons/empty_map.png" alt="" /><span>Accueil</span>
+    </button>
+    <button class="tab" data-tab="enchant" aria-selected="false">
       <img src="assets/items/enchanted_book.png" alt="" /><span>Enchants</span>
     </button>
     <button class="tab" data-tab="structures" aria-selected="false">

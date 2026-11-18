@@ -46,13 +46,14 @@
   })();
 
   const state = {
-    tab: 'enchant',
+    tab: 'home',
     cat: null,       // id de catégorie ouverte
     sel: {},         // { enchantId: level }
     result: null,    // résultat de l'optimiseur
     showOthers: false, // section « Autres enchantements » dépliée
     trade: { prof: null, q: '' }, // onglet Échanges : profession ouverte, recherche
     struct: { id: null, q: '' },  // onglet Structures : structure ouverte, recherche
+    homeQ: '',                    // accueil : recherche globale
     trim: trimState,
   };
 
@@ -61,27 +62,19 @@
   };
 
   // ---------- Onglets ----------
-  function setTab(tab) {
+  function selectTab(tab) {
     state.tab = tab;
-    APP.addEventListener('input', (e) => {
-    if (e.target.id === 'struct-q') {
-      state.struct.q = e.target.value;
-      document.getElementById('struct-body').innerHTML = structureBody();
-      return;
-    }
-    if (e.target.id !== 'trade-q') return;
-    state.trade.q = e.target.value;
-    document.getElementById('trade-body').innerHTML = tradeBody();
-  });
-
-  document.querySelectorAll('.tab').forEach((b) => b.setAttribute('aria-selected', String(b.dataset.tab === tab)));
+    document.querySelectorAll('.tab').forEach((b) => b.setAttribute('aria-selected', String(b.dataset.tab === tab)));
     state.cat = null; state.result = null;
+  }
+  function setTab(tab) {
+    selectTab(tab);
     render();
     window.scrollTo({ top: 0 });
   }
 
-  // ---------- Enchantements : accueil ----------
-  function renderHome() {
+  // ---------- Enchantements : liste des équipements ----------
+  function renderEquipmentList() {
     const groups = [...new Set(DATA.CATEGORIES.map((c) => c.group))];
     return `
       <p class="hint" style="margin:6px 2px 0">Choisis un équipement : le meilleur kit est déjà sélectionné et l'app te donne l'ordre le moins cher à l'enclume. Tu peux l'ajuster.</p>
@@ -125,6 +118,11 @@
   const kitOf = (c) => DATA.KITS[c.id];
   const kitIds = (c) => kitOf(c).list.map(([id]) => id);
   const kitSelection = (c) => Object.fromEntries(kitOf(c).list);
+
+  function openCat(id) {
+    state.cat = id; state.showOthers = false;
+    state.sel = kitSelection(cat(id)); recalc();
+  }
 
   // Recalcule l'ordre dès que la sélection change (au moins deux enchantements).
   function recalc() {
@@ -511,11 +509,142 @@
       <p class="disclaimer">Source : minecraft.wiki (« Ore (feature) », « Amethyst Geode »). Le meilleur niveau est le pic de la distribution ; en pratique les grottes, la lave et le relief changent ce qui est visible.</p>`;
   }
 
+  // ---------- Accueil ----------
+  const TIPS = [
+    "À l'enclume, une opération de plus de 39 niveaux est refusée (« Trop cher »). Combiner d'abord les livres entre eux évite souvent d'y arriver.",
+    "Un enchantement coûte moins cher quand il vient d'un livre : Raccommodage vaut ×2 en livre et ×4 sur un objet.",
+    "Le diamant est le plus fréquent vers y −59, et il n'y en a plus à y 16 et au-dessus.",
+    "La recherche de l'onglet Structures répond à « où trouver tel objet ? » : disques, pommes dorées enchantées, tridents…",
+    "Les motifs de trim ne se voient qu'en 3D : fais tourner le porte-armure de l'onglet Trims.",
+    "Les débris antiques sont les plus fréquents vers y 16 dans le Nether.",
+  ];
+
+  function accueilTiles() {
+    const nLoot = STRUCTS.reduce((a, st) => a + st.containers.reduce((b, c) => b + c.rows.length, 0), 0);
+    const nTrades = TRADES.reduce((a, p) => a + p.levels.reduce((b, l) => b + l.trades.length, 0), 0);
+    const T = [
+      { tab: 'enchant', icon: 'items/enchanted_book', title: 'Enchantements', desc: "Le meilleur kit par équipement et l'ordre d'enclume le moins cher", stat: `${DATA.CATEGORIES.length} équipements` },
+      { tab: 'trims', icon: 'items/diamond_chestplate', title: "Trims d'armure", desc: 'Porte-armure en 3D : matière, motif et couleur', stat: `${DATA.TRIM_PATTERNS.length} motifs · ${DATA.TRIM_MATERIALS.length} couleurs` },
+      { tab: 'structures', icon: 'item-icons/ender_eye', title: 'Structures', desc: 'Où les trouver et ce qu’elles contiennent', stat: `${STRUCTS.length} structures · ${nLoot} butins` },
+      { tab: 'trades', icon: 'item-icons/emerald', title: 'Échanges', desc: 'Tous les échanges des villageois, niveau par niveau', stat: `${nTrades} échanges` },
+      { tab: 'ores', icon: 'items/diamond', title: 'Minerais', desc: 'Le meilleur niveau Y de chaque minerai', stat: `${DATA.ORES.length} minerais` },
+    ];
+    return `<div class="home-tiles">${T.map((t) => `
+      <button class="home-tile" data-action="go-tab" data-tab="${t.tab}">
+        <img class="px" src="${ASSETS}/${t.icon}.png" alt="" />
+        <strong>${esc(t.title)}</strong>
+        <span>${esc(t.desc)}</span>
+        <small>${esc(t.stat)}</small>
+      </button>`).join('')}</div>`;
+  }
+
+  function homeSearch(raw) {
+    const q = raw.trim();
+    const nq = norm(q);
+    let html = '';
+
+    // équipements
+    const cats = DATA.CATEGORIES.filter((c) => norm(c.name).includes(nq));
+    if (cats.length) {
+      html += `<h2 class="section">Équipements</h2><div class="grid">${cats.map((c) => `
+        <button class="tile" data-action="go-cat" data-id="${c.id}">
+          <img class="px" src="${ASSETS}/items/${c.icon}.png" alt="" /><span>${esc(c.name)}</span>
+          <small>${DATA.KITS[c.id].list.length} au kit</small>
+        </button>`).join('')}</div>`;
+    }
+
+    // enchantements
+    const ench = Object.entries(DATA.ENCHANTS).filter(([, d]) => norm(d[0]).includes(nq));
+    if (ench.length) {
+      html += `<h2 class="section">Enchantements</h2>${ench.slice(0, 6).map(([id, d]) => `
+        <div class="trade">
+          <div class="loot-top"><strong>${esc(d[0])}</strong><span class="loot-qty">max ${roman[d[1]]} · livre ×${d[3]} · objet ×${d[2]}</span></div>
+          <div class="chips" style="margin-top:8px">${DATA.CATEGORIES.filter((c) => c.enchants.includes(id)).map((c) =>
+            `<button class="chip chipbtn" data-action="go-cat" data-id="${c.id}">${esc(c.name)}</button>`).join('')}</div>
+        </div>`).join('')}`;
+    }
+
+    // structures par nom
+    const sNames = STRUCTS.filter((s) => norm(s.name).includes(nq));
+    if (sNames.length) {
+      html += `<h2 class="section">Structures</h2><div class="grid">${sNames.map((s) => structTile(s).replace('struct-open', 'go-struct')).join('')}</div>`;
+    }
+
+    // butins
+    const hits = [];
+    for (const s of STRUCTS) for (const c of s.containers) for (const r of c.rows) {
+      if (norm(r.name).includes(nq)) hits.push({ s, c, r });
+    }
+    hits.sort((a, b) => chanceNum(b.r.chance) - chanceNum(a.r.chance));
+    if (hits.length) {
+      html += `<h2 class="section">Où le trouver</h2><p class="hint">${hits.length} source${hits.length > 1 ? 's' : ''} dans les structures, de la plus probable à la moins probable</p>
+        ${hits.slice(0, 6).map((h) => `
+          <div class="trade">
+            <div class="loot-top"><strong>${esc(h.r.name)}</strong><span class="loot-qty">${esc(qtyText(h.r.qty))}</span></div>
+            <div class="chance"><span style="width:${Math.max(2, chanceNum(h.r.chance))}%"></span><b>${esc(h.r.chance)}</b></div>
+            <div class="tname"><button class="link" data-action="go-struct" data-id="${h.s.id}">${esc(h.s.name)}</button> <span>·</span> ${esc(h.c.name)}</div>
+          </div>`).join('')}`;
+    }
+
+    // échanges
+    const tr = [];
+    for (const p of TRADES) for (const l of p.levels) for (const t of l.trades) {
+      if ([...t.wants, ...t.gives].some((x) => norm(x.name).includes(nq))) tr.push({ p, l, t });
+    }
+    if (tr.length) {
+      html += `<h2 class="section">Échanges de villageois</h2>${tr.slice(0, 4).map((x) => `
+          <div class="trade"><div class="tname"><strong>${esc(x.p.name)}</strong> · ${esc(x.l.name)}<br>${esc(itemsText(x.t.wants))} <span>→</span> ${esc(itemsText(x.t.gives))}</div></div>`).join('')}
+        <button class="btn ghost" style="width:100%" data-action="go-trades" data-q="${esc(q)}">Voir les ${tr.length} échange${tr.length > 1 ? 's' : ''}</button>`;
+    }
+
+    // minerais
+    const ores = DATA.ORES.filter((o) => norm(o.name).includes(nq));
+    if (ores.length) {
+      html += `<h2 class="section">Minerais</h2>${ores.map((o) => `
+        <div class="trade"><div class="loot-top"><strong>${esc(o.name)}</strong>
+          <span class="loot-qty">${o.best.length ? 'meilleur : ' + o.best.map(fmtY).join(' · ') : 'uniforme'} · de ${fmtY(o.range[0])} à ${fmtY(o.range[1])}</span></div>
+          <p class="tnote">${esc(o.note)}</p></div>`).join('')}
+        <button class="btn ghost" style="width:100%" data-action="go-tab" data-tab="ores">Ouvrir les minerais</button>`;
+    }
+
+    return html || `<div class="notice warn">Rien ne correspond à « ${esc(q)} ». Essaie un nom d'objet, d'enchantement, de structure ou de minerai.</div>`;
+  }
+
+  function accueilBody() {
+    if (state.homeQ.trim()) return homeSearch(state.homeQ);
+    const tip = TIPS[Math.floor(Date.now() / 86400000) % TIPS.length];
+    return `
+      ${accueilTiles()}
+      <section class="panel tip-card"><div class="control-title">Le saviez-vous ?</div><p>${esc(tip)}</p></section>
+      <section class="panel about">
+        <div class="control-title">À propos</div>
+        <ul>
+          <li>Minecraft <b>Java</b> uniquement.</li>
+          <li>Données issues du wiki Minecraft ; textures du jeu.</li>
+          <li>Fonctionne <b>hors-ligne</b> après la première ouverture.</li>
+          <li>Pour l'installer : menu ⋮ du navigateur → « Installer l'application » (iPhone : Partager → « Sur l'écran d'accueil »).</li>
+        </ul>
+      </section>`;
+  }
+
+  function renderAccueil() {
+    return `
+      <section class="hero">
+        <img class="hero-logo" src="${ASSETS}/icons/icon-192.png" alt="" />
+        <h2 class="hero-title">Grimoire</h2>
+        <p class="hero-sub">Le guide de poche de Minecraft Java</p>
+      </section>
+      <input id="home-q" class="search" type="search" inputmode="search" placeholder="Cherche un objet, un enchantement…" value="${esc(state.homeQ)}" autocomplete="off" />
+      <div id="home-body">${accueilBody()}</div>`;
+  }
+
   // ---------- Rendu global ----------
   function render() {
-    if (state.tab === 'enchant') {
+    if (state.tab === 'home') {
+      APP.innerHTML = renderAccueil();
+    } else if (state.tab === 'enchant') {
       const c = state.cat ? cat(state.cat) : null;
-      APP.innerHTML = c ? renderCategory(c) : renderHome();
+      APP.innerHTML = c ? renderCategory(c) : renderEquipmentList();
     } else if (state.tab === 'structures') {
       APP.innerHTML = renderStructures();
     } else if (state.tab === 'trades') {
@@ -543,10 +672,11 @@
       return;
     }
 
-    if (a === 'open-cat') {
-      state.cat = el.dataset.id; state.showOthers = false;
-      state.sel = kitSelection(cat(state.cat)); recalc();
-    }
+    if (a === 'open-cat') { openCat(el.dataset.id); }
+    else if (a === 'go-tab') { selectTab(el.dataset.tab); window.scrollTo({ top: 0 }); }
+    else if (a === 'go-cat') { selectTab('enchant'); openCat(el.dataset.id); window.scrollTo({ top: 0 }); }
+    else if (a === 'go-struct') { selectTab('structures'); state.struct.id = el.dataset.id; state.struct.q = ''; window.scrollTo({ top: 0 }); }
+    else if (a === 'go-trades') { selectTab('trades'); state.trade.prof = null; state.trade.q = el.dataset.q; window.scrollTo({ top: 0 }); }
     else if (a === 'back') { state.cat = null; state.sel = {}; state.result = null; }
     else if (a === 'struct-open') { state.struct.id = el.dataset.id; state.struct.q = ''; window.scrollTo({ top: 0 }); }
     else if (a === 'struct-back') { state.struct.id = null; window.scrollTo({ top: 0 }); }
@@ -590,7 +720,22 @@
     }
   });
 
+  APP.addEventListener('input', (e) => {
+    if (e.target.id === 'home-q') {
+      state.homeQ = e.target.value;
+      document.getElementById('home-body').innerHTML = accueilBody();
+    } else if (e.target.id === 'struct-q') {
+      state.struct.q = e.target.value;
+      document.getElementById('struct-body').innerHTML = structureBody();
+    } else if (e.target.id === 'trade-q') {
+      state.trade.q = e.target.value;
+      document.getElementById('trade-body').innerHTML = tradeBody();
+    }
+  });
+
   document.querySelectorAll('.tab').forEach((b) => b.addEventListener('click', () => setTab(b.dataset.tab)));
+  const homeLink = document.getElementById('homeLink');
+  if (homeLink) homeLink.addEventListener('click', (e) => { e.preventDefault(); setTab('home'); });
 
   render();
 })();

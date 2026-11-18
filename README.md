@@ -2,6 +2,7 @@
 
 Application web mobile (HTML/CSS/JS, sans build) avec :
 
+0. **Accueil** : page d'ouverture avec une recherche globale (enchantement, équipement, structure, objet de butin, échange, minerai) qui mène directement au bon écran, des raccourcis vers chaque section et une astuce du jour.
 1. **Enchantements** : une catégorie par équipement (casque, plastron, jambières, bottes, épée, lance, masse, hache, pioche, pelle, houe, arc, arbalète, trident, canne à pêche, élytres, cisailles). Tu coches les enchantements voulus, tu choisis leur niveau, et l'app calcule l'ordre d'enclume le moins cher.
 2. **Trims d'armure** : pour chaque pièce, choix de la matière (cuir, maille, cuivre, fer, or, diamant, netherite), couleur de teinture du cuir, motif et matière de trim (11 couleurs). Rendu avec les vraies textures du jeu, dont un **porte-armure 3D** (glisse pour tourner) qui montre les motifs de trim comme en jeu.
 
