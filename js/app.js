@@ -5,6 +5,7 @@
   const STAND = window.MC_STAND;
   const TRADES = window.MC_TRADES;
   const STRUCTS = window.MC_STRUCTURES;
+  const RARE = window.MC_RARE;
   const APP = document.getElementById('app');
   const ASSETS = 'assets';
   const STORE_KEY = 'enchantlab.trims.v1';
@@ -459,6 +460,61 @@
       <div id="struct-body">${structureBody()}</div>`;
   }
 
+  // ---------- Raretés ----------
+  const TIERS = [
+    { key: 'Épique', color: '#ff55ff', label: 'Épique', hint: 'nom violet' },
+    { key: 'Rare', color: '#55ffff', label: 'Rare', hint: 'nom cyan' },
+    { key: 'Peu commun', color: '#ffff55', label: 'Peu commun', hint: 'nom jaune' },
+    { key: null, color: '#b8b0d6', label: 'Rareté du jeu non indiquée', hint: '' },
+  ];
+
+  // Chances de coffre issues de l'onglet Structures (mêmes données que là-bas).
+  function lootSources(names) {
+    const out = [];
+    for (const st of STRUCTS) for (const c of st.containers) for (const r of c.rows) {
+      if (names.includes(r.name)) out.push({ where: `${st.name} · ${c.name}`, chance: r.chance, qty: r.qty });
+    }
+    return out.sort((a, b) => chanceNum(b.chance) - chanceNum(a.chance));
+  }
+
+  function rareCard(e) {
+    const tier = TIERS.find((t) => t.key === e.tier);
+    const loot = e.loot.length ? lootSources(e.loot) : [];
+    const renewCls = e.renew && e.renew.startsWith('Oui') ? 'ok' : (e.renew ? 'no' : '');
+    const li = (w, chance, note) => `
+      <li><span class="src-where">${esc(w)}</span>${chance ? `<span class="src-pct">${esc(chance)}</span>` : ''}${note ? `<small>${esc(note)}</small>` : ''}</li>`;
+    const first = loot.slice(0, 4);
+    const rest = loot.slice(4);
+    return `
+      <article class="ore-card rare-card" style="--tier:${tier.color}">
+        <span class="slot">${sIcon(e.icon)}</span>
+        <div class="ore-main">
+          <div class="ore-top"><strong>${esc(e.name)}</strong></div>
+          <div class="chips" style="margin-top:6px">
+            <span class="chip">${esc(e.kind)}</span>
+            ${e.tier ? `<span class="chip tierchip">${esc(e.tier)}</span>` : ''}
+            ${e.renew ? `<span class="chip ${renewCls}">${e.renew.startsWith('Oui') ? '♻ Renouvelable' : 'Non renouvelable' + (e.renew.includes('(') ? ' ' + esc(e.renew.slice(e.renew.indexOf('('))) : '')}</span>` : ''}
+          </div>
+          <ul class="srcs">
+            ${e.sources.map((x) => li(x.where, x.chance, x.note)).join('')}
+            ${first.map((x) => li(x.where, x.chance, x.qty !== '1' ? 'Quantité : ' + qtyText(x.qty) : '')).join('')}
+          </ul>
+          ${rest.length ? `<details class="more"><summary>${rest.length} autre${rest.length > 1 ? 's' : ''} source${rest.length > 1 ? 's' : ''}</summary><ul class="srcs">${rest.map((x) => li(x.where, x.chance, '')).join('')}</ul></details>` : ''}
+          ${e.note ? `<p class="ore-note">${esc(e.note)}</p>` : ''}
+        </div>
+      </article>`;
+  }
+
+  function renderRare() {
+    return `
+      <p class="hint" style="margin:6px 2px 0">Les objets et blocs les plus rares, avec où les trouver et la chance de les obtenir. La <b>rareté</b> est celle du jeu (couleur du nom de l'objet) ; les <b>%</b> sont les chances par coffre, par mort ou par événement. Le sigle « non renouvelable » veut dire qu'on ne peut pas en obtenir davantage une fois la source épuisée.</p>
+      ${TIERS.map((t) => {
+        const list = RARE.filter((e) => e.tier === t.key);
+        return list.length ? `<h2 class="section" style="color:${t.color}">${esc(t.label)}${t.hint ? ` <small style="font-family:system-ui;color:var(--muted)">(${t.hint})</small>` : ''}</h2>${list.map(rareCard).join('')}` : '';
+      }).join('')}
+      <p class="disclaimer">Source : minecraft.wiki (pages de chaque objet et de ses structures), Java Edition. Les noms français sont à vérifier ; la tête de dragon et le crâne de wither n'ont pas d'icône.</p>`;
+  }
+
   // ---------- Minerais ----------
   const fmtY = (n) => `y ${n < 0 ? '−' + (-n) : n}`;
   const AXES = { overworld: [-64, 320], nether: [0, 128] };
@@ -499,6 +555,8 @@
     if (state.tab === 'enchant') {
       const c = state.cat ? cat(state.cat) : null;
       APP.innerHTML = c ? renderCategory(c) : renderHome();
+    } else if (state.tab === 'rare') {
+      APP.innerHTML = renderRare();
     } else if (state.tab === 'structures') {
       APP.innerHTML = renderStructures();
     } else if (state.tab === 'trades') {

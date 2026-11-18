@@ -7,7 +7,8 @@ Application web mobile (HTML/CSS/JS, sans build) avec :
 
 3. **Minerais** : meilleur niveau Y et plage de génération de chaque minerai (Overworld et Nether).
 4. **Structures** : 23 structures (village, cité antique, bastion, cité de l'End…) avec biomes, commande `/locate` et butins possibles par coffre (929 lignes, chance de trouver chaque objet). La recherche répond aussi à « où trouver tel objet ».
-5. **Échanges** : tous les échanges des 13 professions de villageois et du colporteur (283 échanges, par niveau), avec recherche d'un objet dans toutes les professions.
+5. **Raretés** : 26 objets et blocs parmi les plus rares (œuf de dragon, élytres, pomme dorée enchantée, trident…), avec la rareté du jeu (épique, rare, peu commun), s'ils sont renouvelables, où les trouver et la chance de les obtenir.
+6. **Échanges** : tous les échanges des 13 professions de villageois et du colporteur (283 échanges, par niveau), avec recherche d'un objet dans toutes les professions.
 
 ## Lancer l'app
 
@@ -29,6 +30,7 @@ js/trims.js           composition des armures (teinture + recoloration du trim)
 js/stand.js           porte-armure 3D (three.js, dans vendor/)
 js/trades-data.js     échanges des villageois (généré, ne pas éditer à la main)
 js/structures-data.js structures et butins (généré)
+js/rare-data.js       objets et blocs rares (généré par tools/build_rare.py)
 tools/                scripts qui extraient les échanges du wiki et génèrent js/trades-data.js
 js/app.js             interface
 assets/               textures copiées du jeu (Minecraft 26.1, via PrismarineJS/minecraft-assets)
@@ -66,6 +68,8 @@ python3 -I tools/build_trades.py trades.json <dossier assets 26.1> .
 python3 -I tools/extract_structures.py <dossier wiki> structures_raw.json
 python3 -I tools/build_structures.py structures_raw.json <dossier assets 26.1> .
 ```
+
+- **Raretés** : le choix des objets est subjectif (« les plus rares »). La rareté et la renouvelabilité sont celles de l'infobox du wiki ; les chances viennent des pages du wiki et des données de butin de l'onglet Structures. La tête de dragon et le crâne de wither n'ont pas d'icône dans mes textures.
 
 ## Limites connues
 

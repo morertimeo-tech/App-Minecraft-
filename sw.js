@@ -1,6 +1,6 @@
 // Service worker : met toute l'app en cache pour l'usage hors-ligne.
 // Changer CACHE à chaque mise à jour pour forcer le rafraîchissement.
-const CACHE = 'enchant-lab-v7';
+const CACHE = 'enchant-lab-v8';
 const FILES = [
   './', './index.html', './manifest.webmanifest',
   './assets/armorstand.png',
@@ -28,6 +28,7 @@ const FILES = [
   './assets/item-icons/bamboo_hanging_sign.png',
   './assets/item-icons/bamboo_planks.png',
   './assets/item-icons/barrel_side.png',
+  './assets/item-icons/beacon.png',
   './assets/item-icons/beef.png',
   './assets/item-icons/beetroot.png',
   './assets/item-icons/beetroot_seeds.png',
@@ -136,6 +137,7 @@ const FILES = [
   './assets/item-icons/diamond_sword.png',
   './assets/item-icons/diorite.png',
   './assets/item-icons/disc_fragment_5.png',
+  './assets/item-icons/dragon_egg.png',
   './assets/item-icons/dried_kelp_block.png',
   './assets/item-icons/dripstone_block.png',
   './assets/item-icons/dune_armor_trim_smithing_template.png',
@@ -276,6 +278,7 @@ const FILES = [
   './assets/item-icons/name_tag.png',
   './assets/item-icons/nautilus_shell.png',
   './assets/item-icons/nether_quartz.png',
+  './assets/item-icons/nether_star.png',
   './assets/item-icons/nether_wart.png',
   './assets/item-icons/netherite_ingot.png',
   './assets/item-icons/netherite_scrap.png',
@@ -365,6 +368,7 @@ const FILES = [
   './assets/item-icons/shelf_mushroom.png',
   './assets/item-icons/shelter_pottery_sherd.png',
   './assets/item-icons/short_grass.png',
+  './assets/item-icons/shulker_shell.png',
   './assets/item-icons/silence_armor_trim_smithing_template.png',
   './assets/item-icons/skull_pottery_sherd.png',
   './assets/item-icons/slimeball.png',
@@ -429,6 +433,7 @@ const FILES = [
   './assets/item-icons/wild_armor_trim_smithing_template.png',
   './assets/item-icons/wildflowers.png',
   './assets/item-icons/wind_charge.png',
+  './assets/item-icons/wither_rose.png',
   './assets/item-icons/wooden_axe.png',
   './assets/item-icons/wooden_hoe.png',
   './assets/item-icons/woodland_mansion_map.png',
@@ -588,6 +593,7 @@ const FILES = [
   './js/app.js',
   './js/data.js',
   './js/optimizer.js',
+  './js/rare-data.js',
   './js/stand.js',
   './js/structures-data.js',
   './js/trades-data.js',
