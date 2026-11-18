@@ -1,4 +1,4 @@
-# Enchant Lab — app Minecraft (v1)
+# Grimoire — guide de poche pour Minecraft Java
 
 Application web mobile (HTML/CSS/JS, sans build) avec :
 
@@ -88,3 +88,7 @@ python3 -I tools/build_structures.py structures_raw.json <dossier assets 26.1> .
 
 - Catégories supplémentaires (potions, livres, enchantements de table).
 - Sauvegarde de configurations d'équipement.
+
+## Nom et icône
+
+Le nom « Grimoire » reprend le livre d'enchantement. L'icône est générée par `python3 -I tools/make_icon.py .` à partir de la texture du livre enchanté du jeu (halo, reflet violet, étincelles).

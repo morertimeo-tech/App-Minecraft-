@@ -1,9 +1,11 @@
 // Service worker : met toute l'app en cache pour l'usage hors-ligne.
 // Changer CACHE à chaque mise à jour pour forcer le rafraîchissement.
-const CACHE = 'enchant-lab-v12';
+const CACHE = 'grimoire-v13';
 const FILES = [
   './', './index.html', './manifest.webmanifest',
   './assets/armorstand.png',
+  './assets/icons/apple-touch-icon.png',
+  './assets/icons/favicon-32.png',
   './assets/icons/icon-192.png',
   './assets/icons/icon-512.png',
   './assets/item-icons/acacia_log.png',

@@ -1,15 +1,38 @@
 {
-  "name": "Enchant Lab",
-  "short_name": "Enchant Lab",
-  "description": "Enchantements Minecraft (ordre d'enclume optimal) et trims d'armure",
+  "name": "Grimoire",
+  "short_name": "Grimoire",
+  "description": "Guide de poche pour Minecraft Java : ordre d'enchantement le moins cher, trims d'armure 3D, structures et butins, échanges des villageois, minerais.",
   "start_url": "./index.html",
   "scope": "./",
   "display": "standalone",
   "orientation": "portrait",
   "background_color": "#14101f",
   "theme_color": "#14101f",
+  "lang": "fr",
   "icons": [
-    { "src": "assets/icons/icon-192.png", "sizes": "192x192", "type": "image/png", "purpose": "any maskable" },
-    { "src": "assets/icons/icon-512.png", "sizes": "512x512", "type": "image/png", "purpose": "any maskable" }
+    {
+      "src": "assets/icons/icon-192.png",
+      "sizes": "192x192",
+      "type": "image/png",
+      "purpose": "any"
+    },
+    {
+      "src": "assets/icons/icon-512.png",
+      "sizes": "512x512",
+      "type": "image/png",
+      "purpose": "any"
+    },
+    {
+      "src": "assets/icons/icon-192.png",
+      "sizes": "192x192",
+      "type": "image/png",
+      "purpose": "maskable"
+    },
+    {
+      "src": "assets/icons/icon-512.png",
+      "sizes": "512x512",
+      "type": "image/png",
+      "purpose": "maskable"
+    }
   ]
 }

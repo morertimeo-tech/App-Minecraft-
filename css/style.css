@@ -41,7 +41,8 @@ img.px { image-rendering: pixelated; image-rendering: crisp-edges; }
 /* ---------- En-tête ---------- */
 .topbar {
   position: sticky; top: 0; z-index: 10;
-  padding: 14px 16px 10px;
+  padding: 12px 16px 10px;
+  display: flex; align-items: center; gap: 10px;
   background: linear-gradient(180deg, rgba(13,10,22,.95), rgba(13,10,22,.7));
   backdrop-filter: blur(6px);
   border-bottom: 1px solid #241d3a;
@@ -339,3 +340,7 @@ button.link { background: none; border: 0; padding: 0; font: inherit; font-weigh
 .tab span { font-size: 9.5px; letter-spacing: -0.2px; text-overflow: clip; }
 
 
+
+/* ---------- En-tête Grimoire ---------- */
+.logo { width: 30px; height: 30px; image-rendering: pixelated; filter: drop-shadow(0 0 6px rgba(160, 100, 255, .7)); }
+.tagline { margin-left: auto; color: var(--muted); font-size: 11px; text-align: right; line-height: 1.2; }

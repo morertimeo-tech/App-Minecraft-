@@ -27,6 +27,23 @@
     trimState = JSON.parse(localStorage.getItem(STORE_KEY)) || null;
   } catch (e) { trimState = null; }
   if (!trimState || !trimState.settings) trimState = { piece: 'helmet', settings: defaultTrim() };
+  // Sauvegarde ancienne ou corrompue : toute valeur inconnue retombe sur la valeur par défaut.
+  (function sanitizeTrim() {
+    const ok = (list, v) => list.some((x) => x.id === v);
+    const def = defaultTrim();
+    const saved = trimState.settings || {};
+    DATA.ARMOR_PIECES.forEach((p) => {
+      const cur = saved[p.id] || {};
+      saved[p.id] = {
+        material: ok(DATA.ARMOR_MATERIALS, cur.material) ? cur.material : def[p.id].material,
+        dye: ok(DATA.DYES, cur.dye) ? cur.dye : def[p.id].dye,
+        pattern: ok(DATA.TRIM_PATTERNS, cur.pattern) ? cur.pattern : def[p.id].pattern,
+        trim: ok(DATA.TRIM_MATERIALS, cur.trim) ? cur.trim : def[p.id].trim,
+      };
+    });
+    trimState.settings = saved;
+    if (!ok(DATA.ARMOR_PIECES, trimState.piece)) trimState.piece = 'helmet';
+  })();
 
   const state = {
     tab: 'enchant',
