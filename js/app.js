@@ -4,6 +4,9 @@
   const TRIMS = window.MC_TRIMS;
   const STAND = window.MC_STAND;
   const TRADES = window.MC_TRADES;
+  const FARMS = window.MC_FARMS;
+  const VIDEO = window.MC_VIDEO;
+  const FILE_BUILDS = window.MC_BUILDS || {};
   const STRUCTS = window.MC_STRUCTURES;
   const APP = document.getElementById('app');
   const ASSETS = 'assets';
@@ -54,6 +57,7 @@
     trade: { prof: null, q: '' }, // onglet Échanges : profession ouverte, recherche
     struct: { id: null, q: '' },  // onglet Structures : structure ouverte, recherche
     homeQ: '',                    // accueil : recherche globale
+    farm: { id: null, q: '', adding: false, playing: null, draft: { title: '', url: '', note: '' }, err: '', msg: '', importOpen: false, exportText: '' }, // onglet Fermes
     trim: trimState,
   };
 
@@ -66,6 +70,9 @@
     state.tab = tab;
     document.querySelectorAll('.tab').forEach((b) => b.setAttribute('aria-selected', String(b.dataset.tab === tab)));
     state.cat = null; state.result = null;
+    const bar = document.querySelector('.tabbar');
+    const sel = bar && bar.querySelector('.tab[aria-selected="true"]');
+    if (bar && sel) bar.scrollLeft = sel.offsetLeft - (bar.clientWidth - sel.offsetWidth) / 2;
   }
   function setTab(tab) {
     selectTab(tab);
@@ -528,6 +535,7 @@
       { tab: 'structures', icon: 'item-icons/ender_eye', title: 'Structures', desc: 'Où les trouver et ce qu’elles contiennent', stat: `${STRUCTS.length} structures · ${nLoot} butins` },
       { tab: 'trades', icon: 'item-icons/emerald', title: 'Échanges', desc: 'Tous les échanges des villageois, niveau par niveau', stat: `${nTrades} échanges` },
       { tab: 'ores', icon: 'items/diamond', title: 'Minerais', desc: 'Le meilleur niveau Y de chaque minerai', stat: `${DATA.ORES.length} minerais` },
+      { tab: 'farms', icon: 'item-icons/wheat', title: 'Fermes', desc: 'Les fermes à construire, avec tes vidéos YouTube en direct', stat: `${FARMS.length} fermes · ${FARMS.reduce((a, f) => a + countBuilds(f.id), 0)} builds` },
     ];
     return `<div class="home-tiles">${T.map((t) => `
       <button class="home-tile" data-action="go-tab" data-tab="${t.tab}">
@@ -562,6 +570,12 @@
           <div class="chips" style="margin-top:8px">${DATA.CATEGORIES.filter((c) => c.enchants.includes(id)).map((c) =>
             `<button class="chip chipbtn" data-action="go-cat" data-id="${c.id}">${esc(c.name)}</button>`).join('')}</div>
         </div>`).join('')}`;
+    }
+
+    // fermes
+    const fHits = FARMS.filter((f) => norm(f.name + ' ' + f.produces).includes(nq));
+    if (fHits.length) {
+      html += `<h2 class="section">Fermes</h2><div class="grid">${fHits.slice(0, 6).map((f) => farmTile(f).replace('farm-open', 'go-farm')).join('')}</div>`;
     }
 
     // structures par nom
@@ -638,6 +652,163 @@
       <div id="home-body">${accueilBody()}</div>`;
   }
 
+  // ---------- Fermes et builds ----------
+  const BUILDS_KEY = 'grimoire.builds.v1';
+  const newId = () => Date.now().toString(36) + Math.random().toString(36).slice(2, 6);
+  const farm = (id) => FARMS.find((f) => f.id === id);
+
+  // Liens saisis dans l'app (stockés sur l'appareil). Tout ce qui n'est pas un lien http(s) valide est ignoré.
+  function sanitizeBuilds(raw) {
+    const out = {};
+    if (!raw || typeof raw !== 'object') return out;
+    for (const f of FARMS) {
+      const list = Array.isArray(raw[f.id]) ? raw[f.id] : [];
+      const clean = list
+        .filter((b) => b && typeof b.title === 'string' && b.title.trim() && typeof b.url === 'string' && VIDEO.parseVideoUrl(b.url))
+        .map((b) => ({ id: typeof b.id === 'string' && b.id ? b.id.slice(0, 40) : newId(), title: b.title.trim().slice(0, 80), url: b.url.trim(), note: typeof b.note === 'string' ? b.note.trim().slice(0, 300) : '' }));
+      if (clean.length) out[f.id] = clean;
+    }
+    return out;
+  }
+  let userBuilds = {};
+  try { userBuilds = sanitizeBuilds(JSON.parse(localStorage.getItem(BUILDS_KEY))); } catch (e) { userBuilds = {}; }
+  function saveBuilds() {
+    try { localStorage.setItem(BUILDS_KEY, JSON.stringify(userBuilds)); }
+    catch (e) { state.farm.msg = "Impossible d'enregistrer sur cet appareil (stockage indisponible)."; }
+  }
+
+  // Builds d'une ferme : ceux du fichier js/builds-data.js, puis les tiens.
+  function farmBuilds(id) {
+    const fromFile = (Array.isArray(FILE_BUILDS[id]) ? FILE_BUILDS[id] : [])
+      .filter((b) => b && b.title && b.url && VIDEO.parseVideoUrl(b.url))
+      .map((b, i) => ({ id: `file-${i}`, title: String(b.title), url: String(b.url), note: b.note ? String(b.note) : '', local: false }));
+    return fromFile.concat((userBuilds[id] || []).map((b) => ({ ...b, local: true })));
+  }
+  const countBuilds = (id) => farmBuilds(id).length;
+  const totalLocal = () => Object.values(userBuilds).reduce((a, l) => a + l.length, 0);
+
+  function buildCard(b) {
+    const v = VIDEO.parseVideoUrl(b.url);
+    const open = v.kind === 'youtube' ? v.watch : v.href;
+    const label = v.kind === 'youtube' ? 'YouTube' : v.host;
+    let media = '';
+    if (v.kind === 'youtube') {
+      if (state.farm.playing === b.id) {
+        media = `<div class="player"><iframe src="${esc(v.embed)}" title="${esc(b.title)}" loading="lazy"
+          allow="accelerometer; autoplay; encrypted-media; picture-in-picture; fullscreen" allowfullscreen
+          referrerpolicy="strict-origin-when-cross-origin"></iframe></div>`;
+      } else {
+        const thumb = v.id ? `<img class="thumb" src="https://i.ytimg.com/vi/${esc(v.id)}/hqdefault.jpg" alt="" loading="lazy" />` : '';
+        media = `<button class="player poster" data-action="build-play" data-uid="${esc(b.id)}" aria-label="Lire la vidéo ${esc(b.title)}">
+          ${thumb}<span class="playbtn">▶</span><small>Lire dans l'app · connexion requise</small></button>`;
+      }
+    }
+    return `
+      <article class="build">
+        <div class="build-head"><strong>${esc(b.title)}</strong><span class="chip">${esc(label)}</span></div>
+        ${media}
+        ${b.note ? `<p class="ore-note">${esc(b.note)}</p>` : ''}
+        <div class="build-actions">
+          <a class="btn ghost small" href="${esc(open)}" target="_blank" rel="noopener noreferrer">Ouvrir ↗</a>
+          ${b.local ? `<button class="btn ghost small danger" data-action="build-del" data-uid="${esc(b.id)}">Supprimer</button>` : '<span class="hint">Fichier de l\'app</span>'}
+        </div>
+      </article>`;
+  }
+
+  function addForm() {
+    const d = state.farm.draft;
+    return `
+      <section class="panel" style="margin-top:12px">
+        <div class="control-title">Nouveau build</div>
+        <label class="field">Titre<input id="b-title" type="text" maxlength="80" placeholder="Ex. Ferme à fer compacte" value="${esc(d.title)}" /></label>
+        <label class="field">Lien de la vidéo<input id="b-url" type="url" inputmode="url" placeholder="https://youtu.be/…" value="${esc(d.url)}" autocomplete="off" autocapitalize="off" /></label>
+        <label class="field">Note (facultatif)<input id="b-note" type="text" maxlength="300" placeholder="Rendement, version, remarque…" value="${esc(d.note)}" /></label>
+        ${state.farm.err ? `<div class="notice error" style="margin:8px 0 0">${esc(state.farm.err)}</div>` : ''}
+        <div class="toolbar"><button class="btn" data-action="build-save">Enregistrer</button><button class="btn ghost" data-action="build-cancel">Annuler</button></div>
+      </section>`;
+  }
+
+  function farmDetail(f) {
+    const builds = farmBuilds(f.id);
+    return `
+      <button class="back" data-action="farm-back">← Fermes</button>
+      <div class="cat-head">
+        <span class="bigicon">${sIcon(f.icon)}</span>
+        <div><h2>${esc(f.name)}</h2><p>${esc(f.cat)}</p></div>
+      </div>
+      <p class="sdesc">${esc(f.desc)}</p>
+      <div class="chips" style="margin-top:10px"><span class="chip">Produit : ${esc(f.produces)}</span></div>
+      <h2 class="section">Builds (${builds.length})</h2>
+      ${state.farm.msg ? `<div class="notice warn" style="margin-bottom:10px">${esc(state.farm.msg)}</div>` : ''}
+      ${builds.length ? builds.map(buildCard).join('') : '<div class="notice warn">Aucun build pour cette ferme. Ajoute le lien d\'une vidéo YouTube.</div>'}
+      ${state.farm.adding ? addForm() : '<button class="btn" style="width:100%;margin-top:6px" data-action="build-add">＋ Ajouter un build</button>'}`;
+  }
+
+  function farmTile(f) {
+    const n = countBuilds(f.id);
+    return `<button class="tile" data-action="farm-open" data-id="${f.id}">${sIcon(f.icon)}<span>${esc(f.name)}</span><small>${n ? n + ' build' + (n > 1 ? 's' : '') : 'aucun lien'}</small></button>`;
+  }
+
+  function farmBody() {
+    const { id, q } = state.farm;
+    const nq = norm(q.trim());
+    if (nq) {
+      const list = FARMS.filter((f) => norm(f.name + ' ' + f.produces).includes(nq));
+      return list.length ? `<div class="grid">${list.map(farmTile).join('')}</div>` : `<div class="notice warn">Aucune ferme ne correspond à « ${esc(q.trim())} ».</div>`;
+    }
+    if (id) return farmDetail(farm(id));
+    const cats = [...new Set(FARMS.map((f) => f.cat))];
+    const mine = totalLocal();
+    return cats.map((c) => `<h2 class="section">${esc(c)}</h2><div class="grid">${FARMS.filter((f) => f.cat === c).map(farmTile).join('')}</div>`).join('') + `
+      <h2 class="section">Mes liens</h2>
+      <section class="panel">
+        <p class="hint" style="margin:0 0 8px">${mine} lien${mine > 1 ? 's' : ''} enregistré${mine > 1 ? 's' : ''} sur cet appareil. Garde une copie pour ne pas les perdre si tu réinstalles l'app.</p>
+        ${state.farm.msg ? `<div class="notice warn" style="margin-bottom:8px">${esc(state.farm.msg)}</div>` : ''}
+        <div class="toolbar" style="margin-top:0">
+          <button class="btn ghost small" data-action="builds-export" ${mine ? '' : 'disabled'}>Copier mes liens</button>
+          <button class="btn ghost small" data-action="builds-import-toggle">Importer</button>
+        </div>
+        ${state.farm.exportText ? `<textarea class="area" readonly rows="4" aria-label="Mes liens à copier">${esc(state.farm.exportText)}</textarea>` : ''}
+        ${state.farm.importOpen ? `<textarea id="imp-text" class="area" rows="4" placeholder="Colle ici les liens copiés"></textarea><button class="btn small" data-action="builds-import">Valider l'import</button>` : ''}
+      </section>
+      <p class="disclaimer">Liste de fermes rédigée à la main. Les vidéos viennent de YouTube : le lecteur intégré demande une connexion internet.</p>`;
+  }
+
+  function renderFarms() {
+    return `
+      <input id="farm-q" class="search" type="search" inputmode="search" placeholder="Chercher une ferme (fer, xp, canne…)" value="${esc(state.farm.q)}" autocomplete="off" />
+      <div id="farm-body">${farmBody()}</div>`;
+  }
+
+  // Ajout / suppression / import / export (actions appelées depuis le gestionnaire de clics)
+  function saveDraftBuild() {
+    const d = state.farm.draft;
+    const title = d.title.trim();
+    if (!title) { state.farm.err = 'Donne un titre au build.'; return; }
+    const v = VIDEO.parseVideoUrl(d.url);
+    if (!v) { state.farm.err = 'Ce lien n\'est pas valide. Colle l\'adresse complète de la vidéo (https://…).'; return; }
+    const id = state.farm.id;
+    (userBuilds[id] = userBuilds[id] || []).push({ id: newId(), title: title.slice(0, 80), url: d.url.trim(), note: d.note.trim().slice(0, 300) });
+    saveBuilds();
+    state.farm.adding = false; state.farm.err = ''; state.farm.draft = { title: '', url: '', note: '' };
+    state.farm.msg = v.kind === 'youtube' ? '' : 'Lien enregistré : il n\'est pas de YouTube, il s\'ouvrira hors de l\'app.';
+  }
+  function importBuilds(text) {
+    let raw;
+    try { raw = JSON.parse(text); } catch (e) { state.farm.msg = 'Texte illisible : colle exactement ce qu\'a copié « Copier mes liens ».'; return; }
+    const incoming = sanitizeBuilds(raw);
+    let added = 0;
+    for (const f of FARMS) {
+      for (const b of incoming[f.id] || []) {
+        const have = (userBuilds[f.id] || []).some((x) => x.url === b.url);
+        if (!have) { (userBuilds[f.id] = userBuilds[f.id] || []).push(b); added++; }
+      }
+    }
+    saveBuilds();
+    state.farm.importOpen = false;
+    state.farm.msg = added ? `${added} lien${added > 1 ? 's' : ''} importé${added > 1 ? 's' : ''}.` : 'Aucun nouveau lien à importer.';
+  }
+
   // ---------- Rendu global ----------
   function render() {
     if (state.tab === 'home') {
@@ -645,6 +816,8 @@
     } else if (state.tab === 'enchant') {
       const c = state.cat ? cat(state.cat) : null;
       APP.innerHTML = c ? renderCategory(c) : renderEquipmentList();
+    } else if (state.tab === 'farms') {
+      APP.innerHTML = renderFarms();
     } else if (state.tab === 'structures') {
       APP.innerHTML = renderStructures();
     } else if (state.tab === 'trades') {
@@ -680,6 +853,35 @@
     else if (a === 'back') { state.cat = null; state.sel = {}; state.result = null; }
     else if (a === 'struct-open') { state.struct.id = el.dataset.id; state.struct.q = ''; window.scrollTo({ top: 0 }); }
     else if (a === 'struct-back') { state.struct.id = null; window.scrollTo({ top: 0 }); }
+    else if (a === 'go-farm') { selectTab('farms'); state.farm.id = el.dataset.id; state.farm.q = ''; state.farm.playing = null; window.scrollTo({ top: 0 }); }
+    else if (a === 'farm-open') { state.farm.id = el.dataset.id; state.farm.q = ''; state.farm.playing = null; state.farm.adding = false; state.farm.msg = ''; window.scrollTo({ top: 0 }); }
+    else if (a === 'farm-back') { state.farm.id = null; state.farm.playing = null; state.farm.adding = false; state.farm.msg = ''; window.scrollTo({ top: 0 }); }
+    else if (a === 'build-play') {
+      if (navigator.onLine === false) state.farm.msg = "Pas de connexion internet : la vidéo ne peut pas être lue dans l'app. Utilise « Ouvrir » quand tu es en ligne.";
+      else { state.farm.msg = ''; state.farm.playing = el.dataset.uid; }
+    }
+    else if (a === 'build-add') { state.farm.adding = true; state.farm.err = ''; state.farm.msg = ''; }
+    else if (a === 'build-cancel') { state.farm.adding = false; state.farm.err = ''; state.farm.draft = { title: '', url: '', note: '' }; }
+    else if (a === 'build-save') { saveDraftBuild(); }
+    else if (a === 'build-del') {
+      if (window.confirm('Supprimer ce build ?')) {
+        const id = state.farm.id;
+        userBuilds[id] = (userBuilds[id] || []).filter((b) => b.id !== el.dataset.uid);
+        if (!userBuilds[id].length) delete userBuilds[id];
+        if (state.farm.playing === el.dataset.uid) state.farm.playing = null;
+        saveBuilds();
+      }
+    }
+    else if (a === 'builds-export') {
+      state.farm.exportText = JSON.stringify(userBuilds);
+      state.farm.importOpen = false;
+      state.farm.msg = '';
+      if (navigator.clipboard && navigator.clipboard.writeText) {
+        navigator.clipboard.writeText(state.farm.exportText).then(() => { state.farm.msg = 'Liens copiés. Colle-les dans une note pour les garder.'; render(); }).catch(() => {});
+      }
+    }
+    else if (a === 'builds-import-toggle') { state.farm.importOpen = !state.farm.importOpen; state.farm.exportText = ''; state.farm.msg = ''; }
+    else if (a === 'builds-import') { const t = document.getElementById('imp-text'); importBuilds(t ? t.value : ''); }
     else if (a === 'trade-open') { state.trade.prof = el.dataset.id; window.scrollTo({ top: 0 }); }
     else if (a === 'trade-back') { state.trade.prof = null; window.scrollTo({ top: 0 }); }
     else if (a === 'reset-kit') { state.sel = kitSelection(cat(state.cat)); recalc(); }
@@ -724,7 +926,13 @@
     if (e.target.id === 'home-q') {
       state.homeQ = e.target.value;
       document.getElementById('home-body').innerHTML = accueilBody();
-    } else if (e.target.id === 'struct-q') {
+    } else if (e.target.id === 'farm-q') {
+      state.farm.q = e.target.value;
+      document.getElementById('farm-body').innerHTML = farmBody();
+    } else if (e.target.id === 'b-title') { state.farm.draft.title = e.target.value; }
+    else if (e.target.id === 'b-url') { state.farm.draft.url = e.target.value; }
+    else if (e.target.id === 'b-note') { state.farm.draft.note = e.target.value; }
+    else if (e.target.id === 'struct-q') {
       state.struct.q = e.target.value;
       document.getElementById('struct-body').innerHTML = structureBody();
     } else if (e.target.id === 'trade-q') {
@@ -734,6 +942,7 @@
   });
 
   document.querySelectorAll('.tab').forEach((b) => b.addEventListener('click', () => setTab(b.dataset.tab)));
+  APP.addEventListener('error', (e) => { if (e.target && e.target.classList && e.target.classList.contains('thumb')) e.target.style.display = 'none'; }, true);
   const homeLink = document.getElementById('homeLink');
   if (homeLink) homeLink.addEventListener('click', (e) => { e.preventDefault(); setTab('home'); });
 

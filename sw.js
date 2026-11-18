@@ -1,6 +1,6 @@
 // Service worker : met toute l'app en cache pour l'usage hors-ligne.
 // Changer CACHE à chaque mise à jour pour forcer le rafraîchissement.
-const CACHE = 'grimoire-v14';
+const CACHE = 'grimoire-v15';
 const FILES = [
   './', './index.html', './manifest.webmanifest',
   './assets/armorstand.png',
@@ -30,6 +30,7 @@ const FILES = [
   './assets/item-icons/bamboo_hanging_sign.png',
   './assets/item-icons/bamboo_planks.png',
   './assets/item-icons/barrel_side.png',
+  './assets/item-icons/basalt_side.png',
   './assets/item-icons/beef.png',
   './assets/item-icons/beetroot.png',
   './assets/item-icons/beetroot_seeds.png',
@@ -40,6 +41,7 @@ const FILES = [
   './assets/item-icons/black_dye.png',
   './assets/item-icons/black_wool.png',
   './assets/item-icons/blade_pottery_sherd.png',
+  './assets/item-icons/blaze_rod.png',
   './assets/item-icons/block_of_quartz.png',
   './assets/item-icons/blue_dye.png',
   './assets/item-icons/blue_ice.png',
@@ -82,13 +84,16 @@ const FILES = [
   './assets/item-icons/chainmail_leggings.png',
   './assets/item-icons/cherry_log.png',
   './assets/item-icons/cherry_sapling.png',
+  './assets/item-icons/chicken.png',
   './assets/item-icons/chiseled_stone_bricks.png',
+  './assets/item-icons/chorus_fruit.png',
   './assets/item-icons/clay.png',
   './assets/item-icons/clay_ball.png',
   './assets/item-icons/clock.png',
   './assets/item-icons/clock_00.png',
   './assets/item-icons/coal.png',
   './assets/item-icons/coast_armor_trim_smithing_template.png',
+  './assets/item-icons/cobblestone.png',
   './assets/item-icons/cobweb.png',
   './assets/item-icons/cod.png',
   './assets/item-icons/compass.png',
@@ -369,6 +374,7 @@ const FILES = [
   './assets/item-icons/short_grass.png',
   './assets/item-icons/silence_armor_trim_smithing_template.png',
   './assets/item-icons/skull_pottery_sherd.png',
+  './assets/item-icons/slime_ball.png',
   './assets/item-icons/slimeball.png',
   './assets/item-icons/small_dripleaf.png',
   './assets/item-icons/smooth_stone.png',
@@ -437,6 +443,7 @@ const FILES = [
   './assets/item-icons/yellow_candle.png',
   './assets/item-icons/yellow_dye.png',
   './assets/item-icons/yellow_stained_glass.png',
+  './assets/item-icons/zombie_spawn_egg.png',
   './assets/items/amethyst_shard.png',
   './assets/items/bow.png',
   './assets/items/chainmail_boots.png',
@@ -588,12 +595,15 @@ const FILES = [
   './assets/worn/layer2/netherite.png',
   './css/style.css',
   './js/app.js',
+  './js/builds-data.js',
   './js/data.js',
+  './js/farms-data.js',
   './js/optimizer.js',
   './js/stand.js',
   './js/structures-data.js',
   './js/trades-data.js',
   './js/trims.js',
+  './js/video.js',
   './vendor/three.min.js',
 ];
 self.addEventListener('install', (e) => {

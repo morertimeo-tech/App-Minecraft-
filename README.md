@@ -8,7 +8,8 @@ Application web mobile (HTML/CSS/JS, sans build) avec :
 
 3. **Minerais** : meilleur niveau Y et plage de génération de chaque minerai (Overworld et Nether).
 4. **Structures** : 23 structures (village, cité antique, bastion, cité de l'End…) avec biomes, commande `/locate` et butins possibles par coffre (929 lignes, chance de trouver chaque objet). La recherche répond aussi à « où trouver tel objet ».
-5. **Échanges** : tous les échanges des 13 professions de villageois et du colporteur (283 échanges, par niveau), avec recherche d'un objet dans toutes les professions.
+5. **Fermes** : une liste de fermes à construire (33, classées par catégorie) avec, pour chacune, **tes builds** : des liens de vidéos YouTube que tu ajoutes toi-même, lisibles directement dans l'app (lecteur intégré, connexion requise).
+6. **Échanges** : tous les échanges des 13 professions de villageois et du colporteur (283 échanges, par niveau), avec recherche d'un objet dans toutes les professions.
 
 ## Lancer l'app
 
@@ -30,6 +31,9 @@ js/trims.js           composition des armures (teinture + recoloration du trim)
 js/stand.js           porte-armure 3D (three.js, dans vendor/)
 js/trades-data.js     échanges des villageois (généré, ne pas éditer à la main)
 js/structures-data.js structures et butins (généré)
+js/farms-data.js      liste des fermes (généré par tools/build_farms.py)
+js/builds-data.js     tes liens de vidéos par ferme (à éditer)
+js/video.js           reconnaissance et sécurisation des liens vidéo
 tools/                scripts qui extraient les échanges du wiki et génèrent js/trades-data.js
 js/app.js             interface
 assets/               textures copiées du jeu (Minecraft 26.1, via PrismarineJS/minecraft-assets)
@@ -93,3 +97,48 @@ python3 -I tools/build_structures.py structures_raw.json <dossier assets 26.1> .
 ## Nom et icône
 
 Le nom « Grimoire » reprend le livre d'enchantement. L'icône est générée par `python3 -I tools/make_icon.py .` à partir de la texture du livre enchanté du jeu (halo, reflet violet, étincelles).
+
+## Fermes : ajouter tes liens YouTube
+
+Deux façons, qui se combinent :
+
+1. **Dans l'app** (le plus simple sur téléphone) : onglet Fermes → la ferme → « Ajouter un build » (titre, lien, note). Les liens sont enregistrés **sur l'appareil**. « Copier mes liens » / « Importer » (bas de la liste) permet de les sauvegarder et de les transférer.
+2. **Dans le dépôt** : éditer `js/builds-data.js` (format et exemple dans le fichier). Ces liens s'affichent pour tout le monde et ne se suppriment pas depuis l'app. Un test vérifie que les liens sont valides.
+
+Liens acceptés : `youtu.be/…`, `youtube.com/watch?v=…`, shorts, live, playlists, avec horodatage (`?t=90`, `t=1m30s`). Tout autre lien http(s) est enregistré mais s'ouvre hors de l'app. Les liens `javascript:` ou autres protocoles sont refusés. La vidéo est lue via `youtube-nocookie.com` et ne se charge qu'au clic sur ▶ ; sans connexion, l'app l'indique.
+
+| Identifiant | Ferme |
+|---|---|
+| `mob_farm` | Ferme à mobs (broyeur) |
+| `xp_farm` | Ferme à expérience |
+| `spawner_trap` | Piège à spawner |
+| `raid_farm` | Ferme à raids |
+| `creeper_farm` | Ferme à creepers |
+| `skeleton_farm` | Ferme à squelettes |
+| `spider_farm` | Ferme à araignées |
+| `witch_farm` | Ferme à sorcières |
+| `slime_farm` | Ferme à slimes |
+| `guardian_farm` | Ferme à gardiens |
+| `drowned_farm` | Ferme à noyés |
+| `iron_farm` | Ferme à fer (golems) |
+| `crop_farm` | Ferme de cultures |
+| `sugarcane_farm` | Ferme à canne à sucre |
+| `bamboo_farm` | Ferme à bambou |
+| `kelp_farm` | Ferme à varech |
+| `melon_pumpkin_farm` | Ferme à pastèques et citrouilles |
+| `cactus_farm` | Ferme à cactus |
+| `tree_farm` | Ferme à bois |
+| `nether_wart_farm` | Ferme à verrues du Nether |
+| `honey_farm` | Ferme à miel |
+| `animal_farm` | Ferme d'animaux |
+| `chicken_farm` | Ferme à poulets |
+| `fishing_farm` | Ferme de pêche |
+| `villager_breeder` | Ferme à villageois |
+| `cobble_generator` | Générateur de pierre |
+| `sand_gravel_farm` | Ferme à sable et gravier |
+| `gold_farm` | Ferme à or (piglins zombifiés) |
+| `blaze_farm` | Ferme à blazes |
+| `wither_skeleton_farm` | Ferme à squelettes wither |
+| `enderman_farm` | Ferme à endermen |
+| `chorus_farm` | Ferme à chorus |
+| `basalt_generator` | Générateur de basalte |

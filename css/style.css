@@ -368,3 +368,27 @@ button.link { background: none; border: 0; padding: 0; font: inherit; font-weigh
 .about li { margin: 4px 0; }
 .chipbtn { font: inherit; font-size: 12.5px; color: var(--text); cursor: pointer; }
 .chipbtn:hover { border-color: var(--gold); }
+
+/* ---------- Barre d'onglets défilante (7 onglets) ---------- */
+.tabbar { overflow-x: auto; justify-content: flex-start; scrollbar-width: none; scroll-behavior: smooth; }
+.tabbar::-webkit-scrollbar { display: none; }
+.tab { flex: 0 0 auto; min-width: 66px; max-width: none; }
+
+/* ---------- Fermes et lecteur ---------- */
+.build { margin-bottom: 12px; padding: 12px; background: linear-gradient(180deg, var(--panel-2), var(--panel)); border: 2px solid #15102a; border-radius: var(--radius); }
+.build-head { display: flex; justify-content: space-between; align-items: center; gap: 8px; margin-bottom: 10px; }
+.build-head strong { font-size: 15px; min-width: 0; overflow-wrap: anywhere; }
+.player { position: relative; display: block; width: 100%; aspect-ratio: 16 / 9; border-radius: 10px; overflow: hidden; background: #0c0916; border: 2px solid #000; }
+.player iframe { position: absolute; inset: 0; width: 100%; height: 100%; border: 0; }
+button.poster { padding: 0; cursor: pointer; display: grid; place-items: center; color: var(--text); font: inherit; }
+button.poster .thumb { position: absolute; inset: 0; width: 100%; height: 100%; object-fit: cover; opacity: .85; }
+.playbtn { position: relative; z-index: 1; width: 58px; height: 58px; border-radius: 50%; display: grid; place-items: center; font-size: 24px; padding-left: 4px;
+  background: rgba(20, 16, 31, .85); border: 3px solid var(--gold); color: var(--gold); }
+button.poster small { position: absolute; left: 8px; bottom: 6px; z-index: 1; font-size: 11px; color: #fff; text-shadow: 1px 1px 0 #000; }
+.build-actions { display: flex; align-items: center; gap: 8px; margin-top: 10px; flex-wrap: wrap; }
+.build-actions a.btn { text-decoration: none; display: inline-block; }
+.btn.danger { color: #ffb3b3; }
+.field { display: block; margin-top: 10px; font-size: 13px; color: var(--muted); }
+.field input { display: block; width: 100%; margin-top: 4px; padding: 11px 12px; font: inherit; font-size: 15px; color: var(--text); background: #1d1830; border: 2px solid #120e1d; border-radius: 10px; }
+.field input:focus, .area:focus { outline: none; border-color: var(--gold); }
+.area { display: block; width: 100%; margin: 8px 0; padding: 10px; font: 12.5px ui-monospace, Menlo, Consolas, monospace; color: var(--text); background: #1d1830; border: 2px solid #120e1d; border-radius: 10px; resize: vertical; }
