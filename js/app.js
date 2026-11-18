@@ -493,6 +493,15 @@
       <h2 class="section">${esc(sub.name)}</h2>
       <p class="hint" style="margin:0 2px 10px">${esc(sub.metric)}</p>
       ${sub.entries.map((e) => rareCard(e, sub.entries)).join('')}
+      ${sub.others ? `<h2 class="section">Autres cas rares</h2>
+        ${sub.others.map((o) => `
+          <div class="trade other">
+            <div class="other-top"><span class="slot">${sIcon(o.icon)}</span>
+              <div class="other-main"><strong>${esc(o.name)}</strong>
+                <div class="rate"><b>${esc(o.rate)}</b><small>${esc(o.rateNote)}</small></div></div></div>
+            <p class="srcwhere"><span>Où ?</span> ${esc(o.where)}</p>
+            ${o.note ? `<p class="tnote">ℹ ${esc(o.note)}</p>` : ''}
+          </div>`).join('')}` : ''}
       <p class="disclaimer">Source : minecraft.wiki (Java Edition) et les butins de l'onglet Structures. Les taux de catégories différentes ne se comparent pas entre eux (par mort, par coffre, par naissance…). Noms français à vérifier.</p>`;
   }
 

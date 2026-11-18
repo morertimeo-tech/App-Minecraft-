@@ -1,6 +1,6 @@
 // Service worker : met toute l'app en cache pour l'usage hors-ligne.
 // Changer CACHE à chaque mise à jour pour forcer le rafraîchissement.
-const CACHE = 'enchant-lab-v9';
+const CACHE = 'enchant-lab-v10';
 const FILES = [
   './', './index.html', './manifest.webmanifest',
   './assets/armorstand.png',
@@ -82,6 +82,7 @@ const FILES = [
   './assets/item-icons/chainmail_leggings.png',
   './assets/item-icons/cherry_log.png',
   './assets/item-icons/cherry_sapling.png',
+  './assets/item-icons/chicken_spawn_egg.png',
   './assets/item-icons/chiseled_stone_bricks.png',
   './assets/item-icons/clay.png',
   './assets/item-icons/clay_ball.png',
@@ -179,6 +180,7 @@ const FILES = [
   './assets/item-icons/glow_berries.png',
   './assets/item-icons/glowstone.png',
   './assets/item-icons/goat_horn.png',
+  './assets/item-icons/goat_spawn_egg.png',
   './assets/item-icons/gold_block.png',
   './assets/item-icons/gold_ingot.png',
   './assets/item-icons/gold_nugget.png',
@@ -306,6 +308,7 @@ const FILES = [
   './assets/item-icons/pale_moss_block.png',
   './assets/item-icons/pale_oak_log.png',
   './assets/item-icons/pale_oak_sapling.png',
+  './assets/item-icons/panda_spawn_egg.png',
   './assets/item-icons/paper.png',
   './assets/item-icons/pink_dye.png',
   './assets/item-icons/pink_stained_glass.png',
@@ -390,6 +393,7 @@ const FILES = [
   './assets/item-icons/soul_torch.png',
   './assets/item-icons/spectral_arrow.png',
   './assets/item-icons/spider_eye.png',
+  './assets/item-icons/spider_spawn_egg.png',
   './assets/item-icons/spire_armor_trim_smithing_template.png',
   './assets/item-icons/splash_potion.png',
   './assets/item-icons/spruce_hanging_sign.png',
@@ -446,6 +450,7 @@ const FILES = [
   './assets/item-icons/yellow_candle.png',
   './assets/item-icons/yellow_dye.png',
   './assets/item-icons/yellow_stained_glass.png',
+  './assets/item-icons/zombie_spawn_egg.png',
   './assets/items/amethyst_shard.png',
   './assets/items/bow.png',
   './assets/items/chainmail_boots.png',

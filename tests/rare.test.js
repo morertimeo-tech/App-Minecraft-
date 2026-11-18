@@ -24,10 +24,22 @@ for (const c of R) {
     }
   }
 }
-// Les mobs : 1/1200 < 1/1024 < 0,164 %
-const mobs = R.find((c) => c.id === 'mobs').entries.map((e) => e.name);
-assert.deepStrictEqual(mobs, ['Axolotl bleu', 'Mooshroom brun', 'Mouton rose']);
-assert.ok(1 / 1200 < 1 / 1024 && 1 / 1024 < 0.00164, 'ordre des mobs');
+// Mobs : on recalcule les probabilités à partir des valeurs relevées sur le wiki
+const mobsSub = R.find((c) => c.id === 'mobs');
+const armor = 0.15, fullSetHard = 0.729, diamond = 0.0004, jockey = 0.05 * 0.0475; // 0,2375 %
+const fullDiamond = armor * fullSetHard * diamond;
+const babyJockeyDiamond = fullDiamond * jockey;
+assert.ok(Math.abs(jockey - 0.002375) < 1e-12, 'jockey 0,2375 %');
+assert.strictEqual(Math.round(1 / fullDiamond / 1000), 23, '1 sur ~23 000');
+assert.strictEqual((1 / babyJockeyDiamond / 1e6).toFixed(1), '9.6', '1 sur ~9,6 millions');
+const [m1, m2, m3] = mobsSub.entries;
+assert.ok(Math.abs(m1.p - babyJockeyDiamond) < 1e-15 && Math.abs(m2.p - fullDiamond) < 1e-15, 'p du podium');
+assert.deepStrictEqual(mobsSub.entries.map((e) => e.name.split(',')[0]).slice(2), ['Axolotl bleu']);
+// podium puis « autres » : probabilités strictement croissantes
+const all = [...mobsSub.entries, ...mobsSub.others];
+for (let i = 1; i < all.length; i++) assert.ok(all[i].p >= all[i - 1].p, `mobs mal triés : ${all[i - 1].name} / ${all[i].name}`);
+assert.deepStrictEqual(all.map((e) => e.rank), all.map((_, i) => i + 1), 'rangs consécutifs');
+assert.ok(1 / 1200 < 1 / 1024 && 1 / 1024 < 0.00164);
 // Structures : 80² > 32²/0,2 ; fortin (128 au total) en tête
 assert.ok(80 * 80 > (32 * 32) / 0.2);
 console.log(`OK : ${R.reduce((a, c) => a + c.entries.length, 0)} entrées sur ${R.length} sous-catégories`);

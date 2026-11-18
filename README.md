@@ -69,7 +69,7 @@ python3 -I tools/extract_structures.py <dossier wiki> structures_raw.json
 python3 -I tools/build_structures.py structures_raw.json <dossier assets 26.1> .
 ```
 
-- **Raretés** : les taux de sous-catégories différentes ne se comparent pas (par mort, par coffre, par naissance, par région de chunks). Le trident de noyé (≈ 0,53 %) est un calcul à partir de deux valeurs du wiki. Pour les minerais, le wiki ne donne que des étiquettes d'abondance, pas de pourcentage. Les structures sont classées par espacement de génération (hors contrainte de biome, qui les rend encore plus rares).
+- **Raretés** : les taux de sous-catégories différentes ne se comparent pas (par mort, par coffre, par naissance, par région de chunks). Le trident de noyé (≈ 0,53 %) et les combinaisons de mobs (bébé zombie sur un poulet en armure de diamant, zombie en armure de diamant) sont des calculs à partir des valeurs du wiki, en supposant les tirages indépendants et la difficulté régionale maximale ; jockeys sans taux chiffré (skeleton horseman, camel husk jockey…) non classés. Pour les minerais, le wiki ne donne que des étiquettes d'abondance, pas de pourcentage. Les structures sont classées par espacement de génération (hors contrainte de biome, qui les rend encore plus rares).
 
 ## Limites connues
 

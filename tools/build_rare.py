@@ -19,8 +19,9 @@ HERE = os.path.dirname(os.path.abspath(__file__))
 C = runpy.run_path(os.path.join(HERE, 'common.py'))
 resolve = C['make_resolver'](pack)
 
-def e(rank, name, icon, rate, rate_note, where, chips=(), note=None, check=None):
+def e(rank, name, icon, rate, rate_note, where, chips=(), note=None, check=None, p=None):
     d = dict(rank=rank, name=name, icon=icon, rate=rate, rateNote=rate_note, where=where, chips=list(chips), note=note)
+    if p is not None: d['p'] = p
     if check: d['check'] = check
     return d
 
@@ -37,16 +38,31 @@ SUB = [
      "Cité antique (coffres)", ['Épique', 'Non renouvelable'],
      "La rareté la plus haute des modèles de forge.", check=dict(name='Modèle de forge : Silence', chance='1.2%')),
  ]),
- dict(id='mobs', name='Mobs', metric="Probabilité d'apparition ou de naissance de la variante rare", entries=[
-   e(1, 'Axolotl bleu', 'Axolotl Spawn Egg', '0,083 %', 'soit 1 chance sur 1 200',
+ dict(id='mobs', name='Mobs', metric="Probabilité d'apparition (ou de naissance) du mob ou de la combinaison, par mob apparu", entries=[
+   e(1, 'Bébé zombie sur un poulet, en armure complète de diamant', 'Zombie Spawn Egg', '≈ 1 sur 9,6 millions', 'par zombie qui apparaît',
+     "Overworld, en difficulté Difficile", [],
+     "Calcul à partir des valeurs du wiki, cas le plus favorable (difficulté régionale maximale) : 0,2375 % de jockey × 15 % d'armure × 72,9 % d'ensemble complet × 0,04 % de diamant ≈ 1,04 × 10⁻⁷. Avec des poules à proximité (0,4875 %), environ 1 sur 4,7 millions.",
+     p=0.15 * 0.729 * 0.0004 * 0.002375),
+   e(2, 'Zombie en armure complète de diamant', 'Diamond Chestplate', '≈ 1 sur 23 000', 'par zombie qui apparaît',
+     "Overworld, en difficulté Difficile", [],
+     "15 % d'armure (maximum) × 72,9 % d'ensemble complet (Difficile) × 0,04 % de diamant ≈ 0,0044 %. Toutes les pièces sont de la même matière ; la netherite n'apparaît jamais naturellement. Calcul fait à partir des valeurs du wiki.",
+     p=0.15 * 0.729 * 0.0004),
+   e(3, 'Axolotl bleu', 'Axolotl Spawn Egg', '0,083 %', 'soit 1 chance sur 1 200',
      "Élevage d'axolotls", [],
-     "Lors de la reproduction de deux axolotls, le petit a 1 chance sur 1 200 d'être bleu (variante rare)."),
-   e(2, 'Mooshroom brun', 'Mooshroom Spawn Egg', '≈ 0,098 %', 'soit 1 chance sur 1 024',
-     "Élevage de deux mooshrooms rouges", [],
-     "Un petit brun naît 1 fois sur 1 024. Un éclair à moins de 4 blocs change aussi la couleur d'un mooshroom."),
-   e(3, 'Mouton rose', 'Sheep Spawn Egg', '0,164 %', 'par apparition naturelle',
-     "Biomes tempérés (plaines, forêts, marais, prairie…)", [],
-     "Couleur « très rare » : les moutons blancs (81,836 %), noirs, gris, gris clair (5 % chacun) et bruns (3 %) sont bien plus fréquents."),
+     "Lors de la reproduction de deux axolotls, le petit a 1 chance sur 1 200 d'être bleu (variante rare).", p=1 / 1200),
+ ], others=[
+   e(4, 'Mooshroom brun', 'Mooshroom Spawn Egg', '≈ 0,098 %', 'soit 1 chance sur 1 024', "Élevage de deux mooshrooms rouges", [],
+     "Un éclair à moins de 4 blocs change aussi la couleur d'un mooshroom.", p=1 / 1024),
+   e(5, 'Mouton rose', 'Sheep Spawn Egg', '0,164 %', 'par apparition naturelle', "Biomes tempérés (plaines, forêts, marais, prairie…)", [],
+     "Couleur « très rare » ; les moutons blancs font 81,836 % des apparitions.", p=0.00164),
+   e(6, 'Bébé zombie sur un poulet (chicken jockey)', 'Chicken Spawn Egg', '0,2375 %', 'par zombie ; 0,4875 % avec des poules', "Overworld (Java)", [],
+     "5 % des zombies sont des bébés, dont 4,75 % apparaissent déjà sur un poulet. Le même taux vaut pour les bébés zombifiés piglins.", p=0.002375),
+   e(7, 'Araignée avec un squelette (spider jockey)', 'Spider Spawn Egg', '1 %', 'des araignées', "Overworld", [],
+     "Le cavalier est un squelette ou un stray.", p=0.01),
+   e(8, 'Panda brun', 'Panda Spawn Egg', '≈ 1,6 %', 'soit 1 sur 64 des pandas', "Jungle et jungle de bambous (sur de l'herbe)", [],
+     "Personnalité la plus rare des pandas ; la normale en représente 63,7 %.", p=1 / 64),
+   e(9, 'Chèvre hurlante', 'Goat Spawn Egg', '2 %', 'des chèvres', "Pics gelés, pics déchiquetés, pentes enneigées (ou élevage)", [],
+     "Seule source des cornes « Admire », « Call », « Yearn » et « Dream ».", p=0.02),
  ]),
  dict(id='blocks', name='Blocs', metric="Chance de trouver le bloc (par coffre ou une seule fois)", entries=[
    e(1, 'Œuf de dragon', 'Dragon Egg', '1 par monde', 'unique (2 en Bedrock)',
@@ -90,7 +106,7 @@ os.makedirs(icons_dir, exist_ok=True)
 slug = lambda n: re.sub(r'[^a-z0-9]+', '_', n.lower().replace("'", '')).strip('_')
 missing = []
 for sc in SUB:
-    for en in sc['entries']:
+    for en in sc['entries'] + sc.get('others', []):
         name = en['icon']
         src = resolve(name)
         if not src:

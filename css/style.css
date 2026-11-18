@@ -372,3 +372,8 @@ details.more > summary { cursor: pointer; color: var(--aqua); font-size: 13px; }
 .rate small { color: var(--muted); font-size: 12px; }
 .srcwhere { margin: 8px 0 0; font-size: 13.5px; font-weight: 600; }
 .srcwhere span { color: var(--aqua); }
+
+.other-top { display: flex; gap: 10px; align-items: center; }
+.other-main { flex: 1; min-width: 0; }
+.other-main strong { font-size: 14.5px; }
+.trade.other .rate b { font-size: 12px; }
