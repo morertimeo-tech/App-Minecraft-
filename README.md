@@ -69,7 +69,7 @@ python3 -I tools/extract_structures.py <dossier wiki> structures_raw.json
 python3 -I tools/build_structures.py structures_raw.json <dossier assets 26.1> .
 ```
 
-- **Raretés** : les taux de sous-catégories différentes ne se comparent pas (par mort, par coffre, par naissance, par région de chunks). Le trident de noyé (≈ 0,53 %) et les combinaisons de mobs (bébé zombie sur un poulet en armure de diamant, zombie en armure de diamant) sont des calculs à partir des valeurs du wiki, en supposant les tirages indépendants et la difficulté régionale maximale ; jockeys sans taux chiffré (skeleton horseman, camel husk jockey…) non classés. Pour les minerais, le wiki ne donne que des étiquettes d'abondance, pas de pourcentage. Les structures sont classées par espacement de génération (hors contrainte de biome, qui les rend encore plus rares).
+- **Raretés** : les taux de sous-catégories différentes ne se comparent pas (par mort, par coffre, par naissance, par région de chunks). Le trident de noyé (≈ 0,53 %) et les combinaisons de mobs (bébé zombie sur un poulet en armure de diamant, zombie en armure de diamant) sont des calculs à partir des valeurs du wiki, en supposant les tirages indépendants et la difficulté régionale maximale ; jockeys sans taux chiffré (skeleton horseman, camel husk jockey…) non classés. Pour les minerais, le wiki ne donne que des étiquettes d'abondance, pas de pourcentage. Les structures sont classées par part des chunks qui les reçoivent (probabilité ÷ espacement², tableau « Structure set » du wiki), hors contrainte de biome. La forteresse enterrée (128 par monde) et l'œuf de dragon (obtenu à 100 %) ne sont pas listés comme rares. La section « abîmes » des minerais déduit la présence du deepslate (sous y 8) des plages du wiki.
 
 ## Limites connues
 
@@ -78,7 +78,7 @@ python3 -I tools/build_structures.py structures_raw.json <dossier assets 26.1> .
 - **Échanges** : Java Edition. Le wiki liste parfois du contenu plus récent que mes textures (version 26.1) : bûche et pousse de peuplier, pointe de soufre, bannières, lit et bouclier n'ont pas d'icône (affichés « ? »). Les noms français des objets sont écrits de mémoire, surtout pour les nouveautés.
 - **Minerais** : le « meilleur niveau » est le pic théorique de la distribution ; les mesures réelles du wiki diffèrent parfois (ex. émeraude).
 
-- **Java Edition uniquement.** Bedrock calcule le coût différemment (différence de niveaux au lieu du niveau final).
+- **Java Edition uniquement**, dans toute l'application (coûts d'enclume, butins, échanges, taux).
 - **Noms français** des enchantements écrits de mémoire (le wiki consulté est en anglais) : quelques-uns peuvent différer de la traduction officielle.
 - **Pas de bouclier** : sa texture n'est pas dans le pack d'assets utilisé.
 - **Un seul objet à enchanter, uniquement des livres en sacrifice.** Pas de fusion de deux objets enchantés, ni de réparation, ni de renommage (qui ajoutent des coûts en jeu).

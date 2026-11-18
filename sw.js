@@ -1,6 +1,6 @@
 // Service worker : met toute l'app en cache pour l'usage hors-ligne.
 // Changer CACHE à chaque mise à jour pour forcer le rafraîchissement.
-const CACHE = 'enchant-lab-v10';
+const CACHE = 'enchant-lab-v11';
 const FILES = [
   './', './index.html', './manifest.webmanifest',
   './assets/armorstand.png',
@@ -89,6 +89,7 @@ const FILES = [
   './assets/item-icons/clock.png',
   './assets/item-icons/clock_00.png',
   './assets/item-icons/coal.png',
+  './assets/item-icons/coal_ore.png',
   './assets/item-icons/coast_armor_trim_smithing_template.png',
   './assets/item-icons/cobweb.png',
   './assets/item-icons/cod.png',
@@ -107,6 +108,7 @@ const FILES = [
   './assets/item-icons/copper_ingot.png',
   './assets/item-icons/copper_leggings.png',
   './assets/item-icons/copper_nautilus_armor.png',
+  './assets/item-icons/copper_ore.png',
   './assets/item-icons/copper_spear.png',
   './assets/item-icons/copper_sword.png',
   './assets/item-icons/cornflower.png',
@@ -149,6 +151,7 @@ const FILES = [
   './assets/item-icons/elytra.png',
   './assets/item-icons/emerald.png',
   './assets/item-icons/emerald_block.png',
+  './assets/item-icons/emerald_ore.png',
   './assets/item-icons/empty_map.png',
   './assets/item-icons/enchanted_book.png',
   './assets/item-icons/ender_eye.png',
@@ -357,6 +360,7 @@ const FILES = [
   './assets/item-icons/red_tulip.png',
   './assets/item-icons/redstone.png',
   './assets/item-icons/redstone_dust.png',
+  './assets/item-icons/redstone_ore.png',
   './assets/item-icons/resin_clump.png',
   './assets/item-icons/rib_armor_trim_smithing_template.png',
   './assets/item-icons/rooted_dirt.png',

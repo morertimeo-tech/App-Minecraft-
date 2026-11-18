@@ -40,6 +40,35 @@ const all = [...mobsSub.entries, ...mobsSub.others];
 for (let i = 1; i < all.length; i++) assert.ok(all[i].p >= all[i - 1].p, `mobs mal triés : ${all[i - 1].name} / ${all[i].name}`);
 assert.deepStrictEqual(all.map((e) => e.rank), all.map((_, i) => i + 1), 'rangs consécutifs');
 assert.ok(1 / 1200 < 1 / 1024 && 1 / 1024 < 0.00164);
-// Structures : 80² > 32²/0,2 ; fortin (128 au total) en tête
-assert.ok(80 * 80 > (32 * 32) / 0.2);
+// Structures : part des chunks = probabilité / espacement² (tableau « Structure set » du wiki)
+const structSub = R.find((c) => c.id === 'structures');
+const spacing = { 'Manoir': [80, 1], 'Avant-poste de pillards': [32, 0.2], 'Forteresse du Nether': [27, 0.4], 'Portail en ruine': [40, 1],
+  'Camp abandonné': [37, 1], 'Bastion': [27, 0.6], "Chambres d'épreuves": [34, 1], 'Monument océanique': [32, 1], 'Cité antique': [24, 1] };
+const sAll = [...structSub.entries, ...structSub.others];
+assert.deepStrictEqual(structSub.entries.map((e) => e.name), ['Manoir', 'Avant-poste de pillards', 'Forteresse du Nether']);
+assert.ok(!sAll.some((e) => /Forteresse \(stronghold\)/.test(e.name)), 'le stronghold a été retiré');
+for (const e of sAll) {
+  const [sp, prob] = spacing[e.name];
+  assert.ok(Math.abs(e.p - prob / (sp * sp)) < 1e-12, `${e.name} : p`);
+  // le pourcentage affiché correspond à p × 100 (à l'arrondi près)
+  const shown = parseFloat(e.rate.replace(/[^\d,]/g, '').replace(',', '.'));
+  assert.ok(Math.abs(shown - e.p * 100) / (e.p * 100) < 0.03, `${e.name} : ${e.rate} ≠ ${(e.p * 100).toFixed(4)} %`);
+}
+for (let i = 1; i < sAll.length; i++) assert.ok(sAll[i].p >= sAll[i - 1].p, 'structures triées');
+// Blocs : l'œuf de dragon (100 % à l'obtention) n'est plus listé
+const blocks = R.find((c) => c.id === 'blocks');
+assert.ok(![...blocks.entries, ...(blocks.others || [])].some((e) => /dragon/i.test(e.name)), 'œuf de dragon retiré');
+assert.deepStrictEqual(blocks.entries.map((e) => e.name), ['Bloc de diamant', "Bloc d'émeraude", "Bloc d'or", 'Cloche']);
+// Pourcentages partout où c'est possible : mobs, structures, blocs et objets
+for (const id of ['items', 'mobs', 'blocks', 'structures']) {
+  for (const e of R.find((c) => c.id === id).entries) assert.ok(/%/.test(e.rate), `${id}/${e.name} : pas de pourcentage`);
+}
+// Minerais : étiquettes d'abondance du wiki (pas de pourcentage publié) + section des abîmes
+const ores = R.find((c) => c.id === 'ores');
+assert.ok(ores.othersTitle && ores.others.some((e) => e.name === 'Charbon') && ores.others.some((e) => e.name === 'Émeraude'));
+// Java uniquement : aucune mention de Bedrock dans les données ni dans l'interface
+for (const f of ['app.js', 'rare-data.js', 'structures-data.js', 'trades-data.js']) {
+  assert.ok(!/bedrock/i.test(fs.readFileSync(`${__dirname}/../js/${f}`, 'utf8')), `${f} mentionne Bedrock`);
+}
+assert.ok(!/bedrock/i.test(fs.readFileSync(`${__dirname}/../index.html`, 'utf8')));
 console.log(`OK : ${R.reduce((a, c) => a + c.entries.length, 0)} entrées sur ${R.length} sous-catégories`);

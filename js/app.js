@@ -402,7 +402,7 @@
       <section class="panel" style="margin-top:12px">
         <div class="control-title">Où la trouver</div>
         <div class="chips">${st.biomes.map((b) => `<span class="chip">${esc(b)}</span>`).join('')}</div>
-        <div class="control-title">Commande (Java)</div>
+        <div class="control-title">Commande</div>
         ${locate}
         ${st.tips.length ? `<div class="control-title">Astuce</div>${st.tips.map((t) => `<p class="tnote" style="font-size:13px">💡 ${esc(t)}</p>`).join('')}` : ''}
       </section>
@@ -493,7 +493,7 @@
       <h2 class="section">${esc(sub.name)}</h2>
       <p class="hint" style="margin:0 2px 10px">${esc(sub.metric)}</p>
       ${sub.entries.map((e) => rareCard(e, sub.entries)).join('')}
-      ${sub.others ? `<h2 class="section">Autres cas rares</h2>
+      ${sub.others ? `<h2 class="section">${esc(sub.othersTitle || 'Autres cas rares')}</h2>
         ${sub.others.map((o) => `
           <div class="trade other">
             <div class="other-top"><span class="slot">${sIcon(o.icon)}</span>

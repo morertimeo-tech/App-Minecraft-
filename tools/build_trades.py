@@ -124,15 +124,15 @@ def fr_note(n):
      ('Cartographers can offer multiple village maps', "Le cartographe peut proposer plusieurs cartes de village ; leur cible et leur nombre dépendent du biome, ce qui change les probabilités."),
      ('target is selected when the villager unlocks', "La cible est choisie quand le villageois débloque la carte ; la carte n'est pas proposée si aucune cible n'est trouvée."),
      ('Cartographers can offer multiple banners', "Le cartographe peut proposer plusieurs bannières ; leur couleur et leur nombre dépendent du biome, ce qui change les probabilités."),
-     ('Blindness', "En Java, un effet est tiré au déblocage : Cécité, Saut amélioré, Vision nocturne, Poison, Saturation ou Faiblesse."),
-     ('Due to a bug', "À cause d'un bug, le gâteau coûte actuellement 3 émeraudes en Java."),
+     ('Blindness', "Un effet est tiré au déblocage : Cécité, Saut amélioré, Vision nocturne, Poison, Saturation ou Faiblesse."),
+     ('Due to a bug', "À cause d'un bug, le gâteau coûte actuellement 3 émeraudes."),
      ("boat's material varies", "Le matériau du bateau demandé dépend du biome."),
-     ('brewable regular, extended', "En Java, un effet (normal, prolongé ou renforcé) est tiré au déblocage."),
+     ('brewable regular, extended', "Un effet (normal, prolongé ou renforcé) est tiré au déblocage."),
      ('random color created by two dyes', "L'armure en cuir a une couleur aléatoire, mélange de deux teintures (éventuellement la même)."),
      ('price in emeralds is randomly picked', "Prix en émeraudes tiré dans une plage selon le livre : de 2 + 3×niveau à 6 + 13×niveau (doublé pour les enchantements de trésor), plafonné à 64."),
      ('random enchantment other than Soul Speed', "Enchantement tiré au hasard (sauf Agilité des âmes, Furtivité rapide et Rafale), puis niveau aléatoire. Un villageois peut proposer deux fois le même livre."),
-     ('only one is requested per trade', "En Java, un seul livre est demandé par échange (bug MC-248042)."),
-     ('Because each color represents a unique trade', "Chaque couleur est un échange distinct : en Java, un villageois peut en proposer plusieurs."),
+     ('only one is requested per trade', "Un seul livre est demandé par échange (bug MC-248042)."),
+     ('Because each color represents a unique trade', "Chaque couleur est un échange distinct : un villageois peut en proposer plusieurs."),
      ('Duration:', "Durée de l'effet : 8:00."),
     ]
     for key, txt in rules:
@@ -142,7 +142,7 @@ def fr_note(n):
 prof_in = json.load(open(trades_json, encoding='utf-8'))
 icons_dir = out + '/assets/item-icons'
 os.makedirs(icons_dir, exist_ok=True)
-for f in os.listdir(icons_dir): os.remove(os.path.join(icons_dir, f))
+# (le dossier est partagé avec les autres onglets : on ne supprime rien)
 
 copied, missing, unknown = {}, set(), set()
 def icon_of(n):
