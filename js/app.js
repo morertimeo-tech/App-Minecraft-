@@ -5,7 +5,6 @@
   const STAND = window.MC_STAND;
   const TRADES = window.MC_TRADES;
   const STRUCTS = window.MC_STRUCTURES;
-  const RARE = window.MC_RARE;
   const APP = document.getElementById('app');
   const ASSETS = 'assets';
   const STORE_KEY = 'enchantlab.trims.v1';
@@ -37,7 +36,6 @@
     showOthers: false, // section « Autres enchantements » dépliée
     trade: { prof: null, q: '' }, // onglet Échanges : profession ouverte, recherche
     struct: { id: null, q: '' },  // onglet Structures : structure ouverte, recherche
-    rareSub: 'items',             // onglet Raretés : sous-catégorie
     trim: trimState,
   };
 
@@ -461,50 +459,6 @@
       <div id="struct-body">${structureBody()}</div>`;
   }
 
-  // ---------- Raretés : podium des 3 plus rares par sous-catégorie ----------
-  const SUB_ICON = { items: 'trident', mobs: 'axolotl_spawn_egg', blocks: 'dragon_egg', ores: 'ancient_debris_side', structures: 'ender_eye' };
-
-  function rareCard(e, all) {
-    const tie = all.filter((x) => x.rank === e.rank).length > 1;
-    return `
-      <article class="ore-card rare-card medal-${e.rank}">
-        <span class="medal" title="${tie ? 'ex æquo' : ''}">${e.rank}</span>
-        <span class="slot">${sIcon(e.icon)}</span>
-        <div class="ore-main">
-          <div class="ore-top"><strong>${esc(e.name)}</strong></div>
-          <div class="rate"><b>${esc(e.rate)}</b><small>${esc(e.rateNote)}${tie ? ' · ex æquo' : ''}</small></div>
-          ${e.chips.length ? `<div class="chips" style="margin-top:6px">${e.chips.map((c) => `<span class="chip ${c === 'Renouvelable' ? 'ok' : (c.startsWith('Non') ? 'no' : 'tierchip')}">${esc(c)}</span>`).join('')}</div>` : ''}
-          <p class="srcwhere"><span>Où ?</span> ${esc(e.where)}</p>
-          ${e.note ? `<p class="ore-note">${esc(e.note)}</p>` : ''}
-        </div>
-      </article>`;
-  }
-
-  function renderRare() {
-    const sub = RARE.find((x) => x.id === state.rareSub) || RARE[0];
-    return `
-      <p class="hint" style="margin:6px 2px 0">Ce qui a un taux d'apparition ou d'obtention <b>très faible</b>, par catégorie : le podium des 3 plus rares.</p>
-      <div class="pills" role="tablist">
-        ${RARE.map((c) => `
-          <button class="pill" role="tab" data-action="rare-sub" data-v="${c.id}" aria-selected="${c.id === sub.id}">
-            <img class="px" src="${ASSETS}/item-icons/${SUB_ICON[c.id]}.png" alt="" />${esc(c.name)}
-          </button>`).join('')}
-      </div>
-      <h2 class="section">${esc(sub.name)}</h2>
-      <p class="hint" style="margin:0 2px 10px">${esc(sub.metric)}</p>
-      ${sub.entries.map((e) => rareCard(e, sub.entries)).join('')}
-      ${sub.others ? `<h2 class="section">${esc(sub.othersTitle || 'Autres cas rares')}</h2>
-        ${sub.others.map((o) => `
-          <div class="trade other">
-            <div class="other-top"><span class="slot">${sIcon(o.icon)}</span>
-              <div class="other-main"><strong>${esc(o.name)}</strong>
-                <div class="rate"><b>${esc(o.rate)}</b><small>${esc(o.rateNote)}</small></div></div></div>
-            <p class="srcwhere"><span>Où ?</span> ${esc(o.where)}</p>
-            ${o.note ? `<p class="tnote">ℹ ${esc(o.note)}</p>` : ''}
-          </div>`).join('')}` : ''}
-      <p class="disclaimer">Source : minecraft.wiki (Java Edition) et les butins de l'onglet Structures. Les taux de catégories différentes ne se comparent pas entre eux (par mort, par coffre, par naissance…). Noms français à vérifier.</p>`;
-  }
-
   // ---------- Minerais ----------
   const fmtY = (n) => `y ${n < 0 ? '−' + (-n) : n}`;
   const AXES = { overworld: [-64, 320], nether: [0, 128] };
@@ -545,8 +499,6 @@
     if (state.tab === 'enchant') {
       const c = state.cat ? cat(state.cat) : null;
       APP.innerHTML = c ? renderCategory(c) : renderHome();
-    } else if (state.tab === 'rare') {
-      APP.innerHTML = renderRare();
     } else if (state.tab === 'structures') {
       APP.innerHTML = renderStructures();
     } else if (state.tab === 'trades') {
@@ -579,7 +531,6 @@
       state.sel = kitSelection(cat(state.cat)); recalc();
     }
     else if (a === 'back') { state.cat = null; state.sel = {}; state.result = null; }
-    else if (a === 'rare-sub') { state.rareSub = el.dataset.v; }
     else if (a === 'struct-open') { state.struct.id = el.dataset.id; state.struct.q = ''; window.scrollTo({ top: 0 }); }
     else if (a === 'struct-back') { state.struct.id = null; window.scrollTo({ top: 0 }); }
     else if (a === 'trade-open') { state.trade.prof = el.dataset.id; window.scrollTo({ top: 0 }); }

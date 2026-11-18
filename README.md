@@ -7,8 +7,7 @@ Application web mobile (HTML/CSS/JS, sans build) avec :
 
 3. **Minerais** : meilleur niveau Y et plage de génération de chaque minerai (Overworld et Nether).
 4. **Structures** : 23 structures (village, cité antique, bastion, cité de l'End…) avec biomes, commande `/locate` et butins possibles par coffre (929 lignes, chance de trouver chaque objet). La recherche répond aussi à « où trouver tel objet ».
-5. **Raretés** : le podium des 3 choses les plus rares de chaque sous-catégorie (objets, mobs, blocs, minerais, structures), avec leur taux d'apparition ou d'obtention et où les trouver.
-6. **Échanges** : tous les échanges des 13 professions de villageois et du colporteur (283 échanges, par niveau), avec recherche d'un objet dans toutes les professions.
+5. **Échanges** : tous les échanges des 13 professions de villageois et du colporteur (283 échanges, par niveau), avec recherche d'un objet dans toutes les professions.
 
 ## Lancer l'app
 
@@ -30,7 +29,6 @@ js/trims.js           composition des armures (teinture + recoloration du trim)
 js/stand.js           porte-armure 3D (three.js, dans vendor/)
 js/trades-data.js     échanges des villageois (généré, ne pas éditer à la main)
 js/structures-data.js structures et butins (généré)
-js/rare-data.js       objets et blocs rares (généré par tools/build_rare.py)
 tools/                scripts qui extraient les échanges du wiki et génèrent js/trades-data.js
 js/app.js             interface
 assets/               textures copiées du jeu (Minecraft 26.1, via PrismarineJS/minecraft-assets)
@@ -69,7 +67,6 @@ python3 -I tools/extract_structures.py <dossier wiki> structures_raw.json
 python3 -I tools/build_structures.py structures_raw.json <dossier assets 26.1> .
 ```
 
-- **Raretés** : les taux de sous-catégories différentes ne se comparent pas (par mort, par coffre, par naissance, par région de chunks). Le trident de noyé (≈ 0,53 %) et les combinaisons de mobs (bébé zombie sur un poulet en armure de diamant, zombie en armure de diamant) sont des calculs à partir des valeurs du wiki, en supposant les tirages indépendants et la difficulté régionale maximale ; jockeys sans taux chiffré (skeleton horseman, camel husk jockey…) non classés. Pour les minerais, le wiki ne donne que des étiquettes d'abondance, pas de pourcentage. Les structures sont classées par part des chunks qui les reçoivent (probabilité ÷ espacement², tableau « Structure set » du wiki), hors contrainte de biome. La forteresse enterrée (128 par monde) et l'œuf de dragon (obtenu à 100 %) ne sont pas listés comme rares. La section « abîmes » des minerais déduit la présence du deepslate (sous y 8) des plages du wiki.
 
 ## Limites connues
 
