@@ -392,3 +392,12 @@ button.poster small { position: absolute; left: 8px; bottom: 6px; z-index: 1; fo
 .field input { display: block; width: 100%; margin-top: 4px; padding: 11px 12px; font: inherit; font-size: 15px; color: var(--text); background: #1d1830; border: 2px solid #120e1d; border-radius: 10px; }
 .field input:focus, .area:focus { outline: none; border-color: var(--gold); }
 .area { display: block; width: 100%; margin: 8px 0; padding: 10px; font: 12.5px ui-monospace, Menlo, Consolas, monospace; color: var(--text); background: #1d1830; border: 2px solid #120e1d; border-radius: 10px; resize: vertical; }
+
+/* ---------- Photos d'un échange : bloc de métier + villageois ---------- */
+.thead { display: flex; align-items: flex-end; gap: 8px; margin-bottom: 10px; padding-bottom: 8px; border-bottom: 1px solid rgba(255,255,255,.08); }
+.tpic { flex: none; object-fit: contain; filter: drop-shadow(0 2px 3px rgba(0,0,0,.55)); }
+.tpic.block { width: 54px; height: 54px; }
+.tpic.villager { width: 46px; height: 58px; }
+.tcap { display: flex; flex-direction: column; min-width: 0; margin-left: 2px; line-height: 1.25; padding-bottom: 2px; }
+.tcap strong { font-size: 13.5px; }
+.tcap small { color: var(--muted); font-size: 11.5px; }

@@ -31,6 +31,7 @@ js/trims.js           composition des armures (teinture + recoloration du trim)
 js/stand.js           porte-armure 3D (three.js, dans vendor/)
 js/trades-data.js     échanges des villageois (généré, ne pas éditer à la main)
 js/structures-data.js structures et butins (généré)
+assets/jobsites, assets/villagers  photos du bloc de métier et du villageois en tenue (générées par tools/render_art.js)
 js/farms-data.js      liste des fermes (généré par tools/build_farms.py)
 js/builds-data.js     tes liens de vidéos par ferme (à éditer)
 js/video.js           reconnaissance et sécurisation des liens vidéo
@@ -142,3 +143,14 @@ Liens acceptés : `youtu.be/…`, `youtube.com/watch?v=…`, shorts, live, playl
 | `enderman_farm` | Ferme à endermen |
 | `chorus_farm` | Ferme à chorus |
 | `basalt_generator` | Générateur de basalte |
+
+## Photos des échanges (bloc de métier et villageois)
+
+Chaque échange commence par le bloc de métier (haut fourneau, fumoir, pupitre…) et le villageois dans la tenue de son métier. Ces images sont **générées** à partir du pack de textures du jeu :
+
+```bash
+# blocs : rendu isométrique du vrai modèle 3D ; villageois : texture de base + tenue du métier (chapeau selon les métadonnées du pack)
+node tools/render_art.js <dossier assets 26.1> .
+```
+
+Correspondance métier → bloc : page « Villager » du wiki. Les images du colporteur n'ont pas de bloc.

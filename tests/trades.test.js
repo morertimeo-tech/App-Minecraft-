@@ -36,3 +36,20 @@ assert.strictEqual(armorer.levels[0].trades[0].gives[0].name, 'Émeraude');
 const lib = T.find((p) => p.id === 'librarian');
 assert.ok(lib.levels[0].trades.some((t) => t.gives[0].name === 'Livre enchanté'));
 console.log(`OK : ${T.length} professions, ${total} échanges, ${withIcon} icônes vérifiées`);
+
+// ---- Photos : bloc de métier + villageois en tenue (générées par tools/render_art.js)
+const fs2 = require('fs');
+const isPng = (f) => { const b = fs2.readFileSync(f); return b.length > 1000 && b.slice(0, 8).toString('hex') === '89504e470d0a1a0a'; };
+for (const p of T) {
+  const v = `${__dirname}/../assets/villagers/${p.id}.png`;
+  assert.ok(fs2.existsSync(v) && isPng(v), `${p.id} : villageois manquant`);
+  if (p.block) {
+    assert.ok(typeof p.block === 'string' && p.block.length > 2, `${p.id} : nom du bloc manquant`);
+    const j = `${__dirname}/../assets/jobsites/${p.id}.png`;
+    assert.ok(fs2.existsSync(j) && isPng(j), `${p.id} : bloc de métier manquant`);
+  } else {
+    assert.ok(p.wandering, `${p.id} : seul le colporteur n'a pas de bloc`);
+  }
+}
+assert.strictEqual(T.filter((p) => p.block).length, 13, '13 métiers avec bloc');
+console.log('OK : photos des 13 métiers + colporteur');

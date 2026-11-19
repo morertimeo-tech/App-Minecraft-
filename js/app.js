@@ -329,9 +329,20 @@
   }
   const itemsText = (list) => list.map((x) => `${x.n !== '1' ? x.n + ' × ' : ''}${x.name}`).join(' + ');
 
-  function tradeRow(t) {
+  // En-tête d'un échange : photo du bloc de métier + villageois en tenue + noms
+  function tradePics(p) {
+    return `
+      <div class="thead">
+        ${p.block ? `<img class="tpic block" src="${ASSETS}/jobsites/${esc(p.id)}.png" alt="${esc(p.block)}" title="${esc(p.block)}" loading="lazy" />` : ''}
+        <img class="tpic villager" src="${ASSETS}/villagers/${esc(p.id)}.png" alt="${esc(p.name)}" title="${esc(p.name)}" loading="lazy" />
+        <span class="tcap"><strong>${esc(p.name)}</strong>${p.block ? `<small>${esc(p.block)}</small>` : ''}</span>
+      </div>`;
+  }
+
+  function tradeRow(t, p) {
     return `
       <div class="trade">
+        ${tradePics(p)}
         <div class="tline">${t.wants.map(slot).join('<i>+</i>')}<i class="arr">→</i>${t.gives.map(slot).join('<i>+</i>')}</div>
         <div class="tname">${esc(itemsText(t.wants))} <span>→</span> ${esc(itemsText(t.gives))}</div>
         <div class="tmeta"><span>Chance ${esc(t.p)}</span><span>Stock ${esc(t.stock)}</span>${t.xp ? `<span>${esc(t.xp)} XP</span>` : ''}</div>
@@ -339,9 +350,9 @@
       </div>`;
   }
 
-  function levelBlock(lv) {
+  function levelBlock(lv, p) {
     const xp = lv.xpNeeded != null ? `<small>${lv.xpNeeded} XP de villageois requis</small>` : '';
-    return `<h3 class="lvl">${esc(lv.name)} ${xp}</h3>${lv.trades.map(tradeRow).join('')}`;
+    return `<h3 class="lvl">${esc(lv.name)} ${xp}</h3>${lv.trades.map((t) => tradeRow(t, p)).join('')}`;
   }
 
   function tradeBody() {
@@ -353,7 +364,7 @@
         const hits = lv.trades.filter((t) => [...t.wants, ...t.gives].some((x) => norm(x.name).includes(nq)));
         if (!hits.length) continue;
         count += hits.length;
-        html += `<h3 class="lvl">${esc(p.name)} · ${esc(lv.name)}</h3>${hits.map(tradeRow).join('')}`;
+        html += `<h3 class="lvl">${esc(p.name)} · ${esc(lv.name)}</h3>${hits.map((t) => tradeRow(t, p)).join('')}`;
       }
       return count
         ? `<p class="hint">${count} échange${count > 1 ? 's' : ''} avec « ${esc(q.trim())} »</p>${html}`
@@ -368,7 +379,7 @@
           ${p.icon ? `<img class="px" src="${ASSETS}/item-icons/${p.icon}.png" alt="" />` : ''}
           <div><h2>${esc(p.name)}</h2><p>${n} échanges</p></div>
         </div>
-        ${p.levels.map(levelBlock).join('')}`;
+        ${p.levels.map((l) => levelBlock(l, p)).join('')}`;
     }
     return `
       <div class="grid">
@@ -607,7 +618,7 @@
     }
     if (tr.length) {
       html += `<h2 class="section">Échanges de villageois</h2>${tr.slice(0, 4).map((x) => `
-          <div class="trade"><div class="tname"><strong>${esc(x.p.name)}</strong> · ${esc(x.l.name)}<br>${esc(itemsText(x.t.wants))} <span>→</span> ${esc(itemsText(x.t.gives))}</div></div>`).join('')}
+          <div class="trade">${tradePics(x.p)}<div class="tname"><strong>${esc(x.p.name)}</strong> · ${esc(x.l.name)}<br>${esc(itemsText(x.t.wants))} <span>→</span> ${esc(itemsText(x.t.gives))}</div></div>`).join('')}
         <button class="btn ghost" style="width:100%" data-action="go-trades" data-q="${esc(q)}">Voir les ${tr.length} échange${tr.length > 1 ? 's' : ''}</button>`;
     }
 

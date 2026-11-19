@@ -75,12 +75,14 @@ FR = {
  'Woodland Mansion Map': 'Carte de manoir', 'Yellow Candle': 'Bougie jaune', 'Yellow Dye': 'Teinture jaune',
 }
 
-PROF = {
- 'Armorer': ('Armurier', 'Iron Chestplate'), 'Butcher': ('Boucher', 'Raw Beef'), 'Cartographer': ('Cartographe', 'Empty Map'),
- 'Cleric': ('Clerc', "Bottle o' Enchanting"), 'Farmer': ('Fermier', 'Wheat'), 'Fisherman': ('Pêcheur', 'Raw Cod'),
- 'Fletcher': ('Archer', 'Arrow'), 'Leatherworker': ('Tanneur', 'Leather'), 'Librarian': ('Bibliothécaire', 'Book'),
- 'Mason': ('Maçon', 'Brick'), 'Shepherd': ('Berger', 'White Wool'), 'Toolsmith': ("Forgeron d'outils", 'Enchanted Diamond Pickaxe'),
- 'Weaponsmith': ("Forgeron d'armes", 'Enchanted Iron Sword'), 'Wandering Trader': ('Colporteur', 'Potion of Invisibility'),
+PROF = {   # nom du wiki -> (nom français, objet-icône, bloc de métier ou None)
+ 'Armorer': ('Armurier', 'Iron Chestplate', 'Haut fourneau'), 'Butcher': ('Boucher', 'Raw Beef', 'Fumoir'),
+ 'Cartographer': ('Cartographe', 'Empty Map', 'Table de cartographie'), 'Cleric': ('Clerc', "Bottle o' Enchanting", 'Alambic'),
+ 'Farmer': ('Fermier', 'Wheat', 'Composteur'), 'Fisherman': ('Pêcheur', 'Raw Cod', 'Tonneau'),
+ 'Fletcher': ('Archer', 'Arrow', "Table d'archerie"), 'Leatherworker': ('Tanneur', 'Leather', 'Chaudron'),
+ 'Librarian': ('Bibliothécaire', 'Book', 'Pupitre'), 'Mason': ('Maçon', 'Brick', 'Tailleur de pierre'),
+ 'Shepherd': ('Berger', 'White Wool', 'Métier à tisser'), 'Toolsmith': ("Forgeron d'outils", 'Enchanted Diamond Pickaxe', 'Table de forgeron'),
+ 'Weaponsmith': ("Forgeron d'armes", 'Enchanted Iron Sword', 'Meule'), 'Wandering Trader': ('Colporteur', 'Potion of Invisibility', None),
 }
 LEVEL = {'Novice': ('Novice', 0), 'Apprentice': ('Apprenti', 10), 'Journeyman': ('Compagnon', 70), 'Expert': ('Expert', 150), 'Master': ('Maître', 250),
          'Purchase': ('Achats', None), 'Special': ('Spéciaux', None), 'Ordinary': ('Ordinaires', None)}
@@ -168,7 +170,7 @@ def fr_prob(p):
 out_profs = []
 for p in prof_in:
     pid = slug(p['name'])
-    fr_name, ico = PROF[p['name']]
+    fr_name, ico, block = PROF[p['name']]
     levels = []
     for lv in p['levels']:
         lname, xp = LEVEL[lv['level']]
@@ -180,7 +182,7 @@ for p in prof_in:
             if notes: row['notes'] = notes
             tl.append(row)
         levels.append({'name': lname, 'xpNeeded': xp, 'trades': tl})
-    out_profs.append({'id': pid, 'name': fr_name, 'icon': icon_of(ico), 'wandering': p['name'].startswith('Wandering'), 'levels': levels})
+    out_profs.append({'id': pid, 'name': fr_name, 'icon': icon_of(ico), 'block': block, 'wandering': p['name'].startswith('Wandering'), 'levels': levels})
 
 js = '/* Généré par tools/build_trades.py à partir de minecraft.wiki (Trading), Java Edition. Ne pas éditer à la main. */\nwindow.MC_TRADES = ' + json.dumps(out_profs, ensure_ascii=False, separators=(',', ':')) + ';\n'
 open(out + '/js/trades-data.js', 'w', encoding='utf-8').write(js)
