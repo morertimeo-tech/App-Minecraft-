@@ -401,3 +401,13 @@ button.poster small { position: absolute; left: 8px; bottom: 6px; z-index: 1; fo
 .tcap { display: flex; flex-direction: column; min-width: 0; margin-left: 2px; line-height: 1.25; padding-bottom: 2px; }
 .tcap strong { font-size: 13.5px; }
 .tcap small { color: var(--muted); font-size: 11.5px; }
+
+/* Photos placées une seule fois en haut d'une liste (et plus sur chaque échange) */
+.thead { margin: 18px 0 6px; padding: 0 2px 8px; border-bottom: 1px solid rgba(255,255,255,.1); }
+.thead.big { margin: 4px 0 0; padding: 14px 14px 12px; border: 2px solid #15102a; border-radius: var(--radius);
+  background: radial-gradient(circle at 25% 40%, #4a3f78 0%, #231c3d 70%); box-shadow: inset 0 2px 0 rgba(255,255,255,.06); gap: 14px; align-items: flex-end; }
+.thead.big .tpic.block { width: 84px; height: 84px; }
+.thead.big .tpic.villager { width: 76px; height: 95px; }
+.thead.big .tcap { padding-bottom: 6px; }
+.thead.big .tcap strong { font-size: 20px; }
+.thead.big .tcap small { font-size: 13px; }

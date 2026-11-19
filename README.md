@@ -146,7 +146,7 @@ Liens acceptés : `youtu.be/…`, `youtube.com/watch?v=…`, shorts, live, playl
 
 ## Photos des échanges (bloc de métier et villageois)
 
-Chaque échange commence par le bloc de métier (haut fourneau, fumoir, pupitre…) et le villageois dans la tenue de son métier. Ces images sont **générées** à partir du pack de textures du jeu :
+Chaque liste d'échanges commence, une seule fois, par le bloc de métier (haut fourneau, fumoir, pupitre…) et le villageois dans la tenue de son métier : en bannière sur la fiche d'un métier, en petit en-tête par métier dans les recherches. Ces images sont **générées** à partir du pack de textures du jeu :
 
 ```bash
 # blocs : rendu isométrique du vrai modèle 3D ; villageois : texture de base + tenue du métier (chapeau selon les métadonnées du pack)
