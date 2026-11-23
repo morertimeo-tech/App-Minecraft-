@@ -8,8 +8,9 @@ Application web mobile (HTML/CSS/JS, sans build) avec :
 
 3. **Minerais** : meilleur niveau Y et plage de génération de chaque minerai (Overworld et Nether).
 4. **Structures** : 23 structures (village, cité antique, bastion, cité de l'End…) avec biomes, commande `/locate` et butins possibles par coffre (929 lignes, chance de trouver chaque objet). La recherche répond aussi à « où trouver tel objet ».
-5. **Fermes** : une liste de fermes à construire (33, classées par catégorie) avec, pour chacune, **tes builds** : des liens de vidéos YouTube que tu ajoutes toi-même, lisibles directement dans l'app (lecteur intégré, connexion requise).
-6. **Échanges** : tous les échanges des 13 professions de villageois et du colporteur (283 échanges, par niveau), avec recherche d'un objet dans toutes les professions.
+5. **Graine** : prépare ta graine (nombre ou texte converti comme dans le jeu), la version, la dimension et les coordonnées, puis ouvre la carte sur **Chunkbase** (site externe) déjà réglée, ou affiche-la dans l'app (essai). Les **chunks à slimes** (Java) et les conversions de coordonnées sont calculés dans l'app, hors-ligne. Graines enregistrables, avec copie et import.
+6. **Fermes** : une liste de fermes à construire (33, classées par catégorie) avec, pour chacune, **tes builds** : des liens de vidéos YouTube que tu ajoutes toi-même, lisibles directement dans l'app (lecteur intégré, connexion requise).
+7. **Échanges** : tous les échanges des 13 professions de villageois et du colporteur (283 échanges, par niveau), avec recherche d'un objet dans toutes les professions.
 
 ## Lancer l'app
 
@@ -35,6 +36,7 @@ assets/jobsites, assets/villagers  photos du bloc de métier et du villageois en
 js/farms-data.js      liste des fermes (généré par tools/build_farms.py)
 js/builds-data.js     tes liens de vidéos par ferme (à éditer)
 js/video.js           reconnaissance et sécurisation des liens vidéo
+js/seed.js            graine, chunks à slimes, coordonnées et lien Chunkbase
 tools/                scripts qui extraient les échanges du wiki et génèrent js/trades-data.js
 js/app.js             interface
 assets/               textures copiées du jeu (Minecraft 26.1, via PrismarineJS/minecraft-assets)
@@ -154,3 +156,11 @@ node tools/render_art.js <dossier assets 26.1> .
 ```
 
 Correspondance métier → bloc : page « Villager » du wiki. Les images du colporteur n'ont pas de bloc.
+
+## Graine et Chunkbase : ce qui est vérifié et ce qui ne l'est pas
+
+- **Calculé dans l'app et testé** : conversion de graine comme dans le jeu (nombre 64 bits, sinon `String.hashCode`), chunks à slimes (algorithme du wiki, croisé avec une réimplémentation indépendante et des vecteurs publics de `java.util.Random`), conversions de coordonnées.
+- **Non recodé** : les biomes et la position des structures. Ils demandent de simuler tout le générateur de terrain, qui change selon les versions ; pour ça, l'app prépare un lien vers Chunkbase.
+- **Lien Chunkbase** : le format `…/apps/seed-map#seed=…&platform=java_1_21&dimension=overworld&x=…&z=…` vient d'un seul lien partagé trouvé en ligne, pas d'une documentation du site (Chunkbase n'était pas joignable depuis l'environnement de développement). Les valeurs de version et de dimension autres que celles de cet exemple (`java_1_20`…, `nether`, `end`) sont déduites. Si le site change ou refuse un réglage, la graine reste copiable.
+- **Affichage dans l'app** : essai avec un `iframe` ; non testé contre le vrai site, qui peut refuser d'être intégré.
+- Pas d'accès officiel à Chunkbase : Grimoire n'en est pas affilié.

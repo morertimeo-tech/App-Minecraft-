@@ -411,3 +411,18 @@ button.poster small { position: absolute; left: 8px; bottom: 6px; z-index: 1; fo
 .thead.big .tcap { padding-bottom: 6px; }
 .thead.big .tcap strong { font-size: 20px; }
 .thead.big .tcap small { font-size: 13px; }
+
+/* ---------- Graine ---------- */
+.field select { display: block; width: 100%; margin-top: 4px; padding: 11px 12px; font: inherit; font-size: 15px; color: var(--text); background: #1d1830; border: 2px solid #120e1d; border-radius: 10px; }
+.field select:focus { outline: none; border-color: var(--gold); }
+.two { display: grid; grid-template-columns: 1fr 1fr; gap: 10px; }
+.seedline { margin: 0 0 10px; font-size: 14px; overflow-wrap: anywhere; }
+.seedline b { font-family: ui-monospace, Menlo, Consolas, monospace; color: var(--aqua); }
+.slimecv { display: block; width: 100%; max-width: 341px; height: auto; margin: 0 auto; image-rendering: pixelated; border: 2px solid #000; border-radius: 8px; background: #1d1830; touch-action: manipulation; cursor: crosshair; }
+.kv { display: grid; grid-template-columns: auto 1fr; gap: 6px 14px; font-size: 13.5px; }
+.kv span { color: var(--muted); }
+.kv b { font-weight: 600; overflow-wrap: anywhere; }
+.kv small { color: var(--muted); font-weight: 400; }
+.embed { margin-top: 10px; height: 70vh; min-height: 420px; border: 2px solid #000; border-radius: 10px; overflow: hidden; background: #fff; }
+.embed iframe { width: 100%; height: 100%; border: 0; }
+a.chip { text-decoration: none; }

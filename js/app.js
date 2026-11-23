@@ -5,6 +5,7 @@
   const STAND = window.MC_STAND;
   const TRADES = window.MC_TRADES;
   const FARMS = window.MC_FARMS;
+  const SEED = window.MC_SEED;
   const VIDEO = window.MC_VIDEO;
   const FILE_BUILDS = window.MC_BUILDS || {};
   const STRUCTS = window.MC_STRUCTURES;
@@ -57,6 +58,7 @@
     trade: { prof: null, q: '' }, // onglet Échanges : profession ouverte, recherche
     struct: { id: null, q: '' },  // onglet Structures : structure ouverte, recherche
     homeQ: '',                    // accueil : recherche globale
+    seed: { text: '', platform: 'java_1_21', dimension: 'overworld', x: '0', z: '0', embed: false, name: '', saved: [], pan: [0, 0], picked: null, msg: '', importOpen: false, exportText: '' }, // onglet Graine
     farm: { id: null, q: '', adding: false, playing: null, draft: { title: '', url: '', note: '' }, err: '', msg: '', importOpen: false, exportText: '' }, // onglet Fermes
     trim: trimState,
   };
@@ -548,6 +550,7 @@
       { tab: 'structures', icon: 'item-icons/ender_eye', title: 'Structures', desc: 'Où les trouver et ce qu’elles contiennent', stat: `${STRUCTS.length} structures · ${nLoot} butins` },
       { tab: 'trades', icon: 'item-icons/emerald', title: 'Échanges', desc: 'Tous les échanges des villageois, niveau par niveau', stat: `${nTrades} échanges` },
       { tab: 'ores', icon: 'items/diamond', title: 'Minerais', desc: 'Le meilleur niveau Y de chaque minerai', stat: `${DATA.ORES.length} minerais` },
+      { tab: 'seed', icon: 'item-icons/slimeball', title: 'Graine', desc: 'Ouvre ta graine sur Chunkbase, chunks à slimes et coordonnées', stat: 'Version · dimension · X Z' },
       { tab: 'farms', icon: 'item-icons/wheat', title: 'Fermes', desc: 'Les fermes à construire, avec tes vidéos YouTube en direct', stat: `${FARMS.length} fermes · ${FARMS.reduce((a, f) => a + countBuilds(f.id), 0)} builds` },
     ];
     return `<div class="home-tiles">${T.map((t) => `
@@ -824,6 +827,235 @@
     state.farm.msg = added ? `${added} lien${added > 1 ? 's' : ''} importé${added > 1 ? 's' : ''}.` : 'Aucun nouveau lien à importer.';
   }
 
+  // ---------- Graine ----------
+  const SEEDS_KEY = 'grimoire.seeds.v1';
+  const PLATFORM_LABEL = (id) => 'Java ' + id.replace('java_', '').replace(/_/g, '.');
+  const DIM_LABEL = { overworld: 'Overworld', nether: 'Nether', end: "L'End" };
+  const TOOLS = [
+    ['seed-map', 'Carte de la graine', 'biomes et structures'],
+    ['slime-finder', 'Chunks à slimes', 'version Chunkbase'],
+    ['cave-finder', 'Grottes', 'cave finder'],
+    ['igloo-finder', 'Igloos', 'igloo finder'],
+    ['seed-finder', 'Chercher une graine', 'seed finder'],
+  ];
+
+  function sanitizeSeedEntry(b) {
+    if (!b || typeof b !== 'object') return null;
+    const text = typeof b.text === 'string' ? b.text.trim().slice(0, 100) : '';
+    const x = Number(b.x), z = Number(b.z);
+    return {
+      id: typeof b.id === 'string' && b.id ? b.id.slice(0, 40) : newId(),
+      name: (typeof b.name === 'string' && b.name.trim() ? b.name.trim() : 'Ma graine').slice(0, 60),
+      text,
+      platform: SEED.PLATFORMS.includes(b.platform) ? b.platform : 'java_1_21',
+      dimension: SEED.DIMENSIONS.includes(b.dimension) ? b.dimension : 'overworld',
+      x: Number.isInteger(x) && Math.abs(x) <= SEED.COORD_LIMIT ? x : 0,
+      z: Number.isInteger(z) && Math.abs(z) <= SEED.COORD_LIMIT ? z : 0,
+    };
+  }
+  try {
+    const raw = JSON.parse(localStorage.getItem(SEEDS_KEY));
+    if (raw && typeof raw === 'object') {
+      const f = sanitizeSeedEntry({ ...raw.form, name: 'form' });
+      if (f) Object.assign(state.seed, { text: f.text, platform: f.platform, dimension: f.dimension, x: String(f.x), z: String(f.z) });
+      if (Array.isArray(raw.saved)) state.seed.saved = raw.saved.map(sanitizeSeedEntry).filter((e) => e && e.text).slice(0, 50);
+    }
+  } catch (e) { /* sauvegarde absente ou corrompue : valeurs par défaut */ }
+  function saveSeedState() {
+    const sd = state.seed;
+    try { localStorage.setItem(SEEDS_KEY, JSON.stringify({ form: { text: sd.text, platform: sd.platform, dimension: sd.dimension, x: sd.x, z: sd.z }, saved: sd.saved })); }
+    catch (e) { sd.msg = "Impossible d'enregistrer sur cet appareil (stockage indisponible)."; }
+  }
+
+  const seedNum = (v) => { const n = Number(String(v).trim()); return String(v).trim() !== '' && Number.isInteger(n) && Math.abs(n) <= SEED.COORD_LIMIT ? n : null; };
+  const seedXZ = () => [seedNum(state.seed.x), seedNum(state.seed.z)];
+  function seedUrl(tool) {
+    const ps = SEED.parseSeed(state.seed.text);
+    const [x, z] = seedXZ();
+    return SEED.chunkbaseUrl({ tool, seed: ps.seed, platform: state.seed.platform, dimension: state.seed.dimension, x, z });
+  }
+
+  function seedOutputs() {
+    const sd = state.seed;
+    const ps = SEED.parseSeed(sd.text);
+    const [x, z] = seedXZ();
+    const url = seedUrl('seed-map');
+    const has = ps.kind !== 'empty';
+    let resolved;
+    if (ps.kind === 'empty') resolved = '<p class="hint" style="margin:0 0 10px">Entre une graine (un nombre, ou un texte comme dans le jeu) pour générer le lien.</p>';
+    else if (ps.kind === 'number') resolved = `<p class="seedline">Graine : <b>${esc(ps.seed.toString())}</b></p>`;
+    else resolved = `<p class="seedline">Texte « ${esc(ps.text)} » → graine <b>${esc(ps.seed.toString())}</b> <small>(conversion du jeu)</small></p>`;
+
+    const coordsOk = x !== null && z !== null;
+    const det = coordsOk ? SEED.describeCoords(sd.dimension, x, z) : null;
+    const fmt = (a) => `${a[0]} ; ${a[1]}`;
+    const conv = det ? `
+      <div class="control-title">Coordonnées</div>
+      <div class="kv">
+        ${det.overworld ? `<span>Overworld</span><b>X ${det.overworld[0]} · Z ${det.overworld[1]}</b>` : ''}
+        ${det.nether ? `<span>Nether</span><b>X ${det.nether[0]} · Z ${det.nether[1]}</b>` : ''}
+        ${det.end ? `<span>L'End</span><b>X ${det.end[0]} · Z ${det.end[1]}</b>` : ''}
+        <span>Chunk</span><b>${fmt(det.chunk)} <small>(blocs X ${det.chunkBlocks.x[0]} à ${det.chunkBlocks.x[1]}, Z ${det.chunkBlocks.z[0]} à ${det.chunkBlocks.z[1]})</small></b>
+        <span>Région</span><b>${fmt(det.region)}</b>
+        <span>Position dans le chunk</span><b>${fmt(det.inChunk)}</b>
+      </div>
+      ${det.nether && sd.dimension === 'overworld' ? '<p class="hint" style="margin:6px 0 0">Nether = Overworld ÷ 8 (arrondi vers le bas), sur X et Z seulement.</p>' : ''}` : '<p class="hint">Entre des coordonnées entières valides (X et Z) pour les convertir.</p>';
+
+    const slime = !has ? '<p class="hint">Entre une graine pour calculer les chunks à slimes.</p>'
+      : sd.dimension !== 'overworld' ? '<p class="hint">Les chunks à slimes n\'existent que dans l\'Overworld : choisis cette dimension.</p>'
+      : !coordsOk ? '<p class="hint">Entre des coordonnées valides pour centrer la carte.</p>' : `
+        <canvas id="slime-cv" class="slimecv" width="341" height="341" aria-label="Carte des chunks à slimes"></canvas>
+        <div class="toolbar" style="margin-top:8px">
+          <button class="btn ghost small" data-action="slime-pan" data-dx="-8" data-dz="0" aria-label="Gauche">◀</button>
+          <button class="btn ghost small" data-action="slime-pan" data-dx="0" data-dz="-8" aria-label="Haut">▲</button>
+          <button class="btn ghost small" data-action="slime-pan" data-dx="0" data-dz="8" aria-label="Bas">▼</button>
+          <button class="btn ghost small" data-action="slime-pan" data-dx="8" data-dz="0" aria-label="Droite">▶</button>
+          <button class="btn ghost small" data-action="slime-pan" data-dx="0" data-dz="0" data-reset="1">Recentrer</button>
+        </div>
+        <div id="slime-info" class="hint" style="margin-top:6px">${slimeInfoText()}</div>`;
+
+    return `
+      ${resolved}
+      <div class="toolbar" style="margin-top:0">
+        <a class="btn" href="${esc(url)}" target="_blank" rel="noopener noreferrer">Ouvrir sur Chunkbase ↗</a>
+        <button class="btn ghost small" data-action="seed-embed">${sd.embed ? 'Masquer ici' : 'Afficher ici (essai)'}</button>
+      </div>
+      <div class="toolbar" style="margin-top:6px">
+        <button class="btn ghost small" data-action="seed-copy-link">Copier le lien</button>
+        <button class="btn ghost small" data-action="seed-copy-seed" ${has ? '' : 'disabled'}>Copier la graine</button>
+      </div>
+      ${sd.msg ? `<div class="notice warn" style="margin-top:8px">${esc(sd.msg)}</div>` : ''}
+      <div class="cmd" style="margin-top:8px"><code>${esc(url)}</code></div>
+      ${sd.embed ? `<div class="embed"><iframe src="${esc(url)}" title="Chunkbase" loading="lazy" referrerpolicy="no-referrer"
+          sandbox="allow-scripts allow-same-origin allow-popups allow-forms allow-popups-to-escape-sandbox"></iframe></div>
+        <p class="hint">Si l'écran reste vide ou affiche une erreur, c'est que Chunkbase refuse d'être affiché dans une autre application : utilise « Ouvrir sur Chunkbase ».</p>` : ''}
+      <h2 class="section">Chunks à slimes (calculés ici)</h2>
+      ${slime}
+      <h2 class="section">Convertisseur</h2>
+      <section class="panel">${conv}</section>`;
+  }
+
+  function slimeInfoText() {
+    const p = state.seed.picked;
+    if (!p) return "Touche un chunk pour voir ses coordonnées. Vert = chunk à slimes, cadre doré = chunk de ta position.";
+    return `Chunk <b>${p.cx} ; ${p.cz}</b> — blocs X ${p.cx * 16} à ${p.cx * 16 + 15}, Z ${p.cz * 16} à ${p.cz * 16 + 15} : ${p.slime ? '<b style="color:var(--green)">chunk à slimes</b>' : 'pas de slimes'}.`;
+  }
+
+  // Dessine la carte : 31 × 31 chunks autour du chunk de la position (décalée par les flèches)
+  const SLIME_N = 31, SLIME_CELL = 11;
+  function slimeOrigin() {
+    const [x, z] = seedXZ();
+    return [SEED.blockToChunk(x) + state.seed.pan[0], SEED.blockToChunk(z) + state.seed.pan[1]];
+  }
+  function drawSlime() {
+    const cv = document.getElementById('slime-cv');
+    if (!cv) return;
+    const ps = SEED.parseSeed(state.seed.text);
+    if (ps.kind === 'empty') return;
+    const [ocx, ocz] = slimeOrigin();
+    const [x, z] = seedXZ();
+    const homeC = [SEED.blockToChunk(x), SEED.blockToChunk(z)];
+    const half = (SLIME_N - 1) / 2;
+    const ctx = cv.getContext('2d');
+    ctx.clearRect(0, 0, cv.width, cv.height);
+    for (let i = 0; i < SLIME_N; i++) for (let j = 0; j < SLIME_N; j++) {
+      const cx = ocx - half + i, cz = ocz - half + j;
+      const slime = SEED.isSlimeChunk(ps.seed, cx, cz);
+      ctx.fillStyle = slime ? '#55ff55' : '#1d1830';
+      ctx.fillRect(i * SLIME_CELL, j * SLIME_CELL, SLIME_CELL, SLIME_CELL);
+      ctx.strokeStyle = 'rgba(255,255,255,.08)';
+      ctx.strokeRect(i * SLIME_CELL + .5, j * SLIME_CELL + .5, SLIME_CELL - 1, SLIME_CELL - 1);
+      if (cx === 0 || cz === 0) { ctx.fillStyle = 'rgba(85,170,255,.28)'; ctx.fillRect(i * SLIME_CELL, j * SLIME_CELL, SLIME_CELL, SLIME_CELL); }   // axes X=0 / Z=0
+    }
+    const mark = (cx, cz, color, w) => {
+      const i = cx - (ocx - half), j = cz - (ocz - half);
+      if (i < 0 || j < 0 || i >= SLIME_N || j >= SLIME_N) return;
+      ctx.strokeStyle = color; ctx.lineWidth = w; ctx.strokeRect(i * SLIME_CELL + w / 2, j * SLIME_CELL + w / 2, SLIME_CELL - w, SLIME_CELL - w); ctx.lineWidth = 1;
+    };
+    mark(homeC[0], homeC[1], '#ffb83d', 2);
+    if (state.seed.picked) mark(state.seed.picked.cx, state.seed.picked.cz, '#ffffff', 2);
+  }
+
+  function seedSavedList() {
+    const list = state.seed.saved;
+    return list.length ? list.map((e) => `
+      <div class="trade">
+        <div class="loot-top"><strong>${esc(e.name)}</strong><span class="loot-qty">${esc(PLATFORM_LABEL(e.platform))} · ${esc(DIM_LABEL[e.dimension])}</span></div>
+        <div class="tname" style="font-family:ui-monospace,Menlo,monospace;font-size:12.5px;overflow-wrap:anywhere">${esc(e.text || '(sans graine)')} · X ${e.x} · Z ${e.z}</div>
+        <div class="toolbar" style="margin-top:8px">
+          <button class="btn small" data-action="seed-load" data-id="${esc(e.id)}">Charger</button>
+          <a class="btn ghost small" href="${esc(SEED.chunkbaseUrl({ tool: 'seed-map', seed: SEED.parseSeed(e.text).seed, platform: e.platform, dimension: e.dimension, x: e.x, z: e.z }))}" target="_blank" rel="noopener noreferrer">Chunkbase ↗</a>
+          <button class="btn ghost small danger" data-action="seed-del" data-id="${esc(e.id)}">Supprimer</button>
+        </div>
+      </div>`).join('') : '<p class="hint">Aucune graine enregistrée.</p>';
+  }
+
+  function renderSeed() {
+    const sd = state.seed;
+    return `
+      <p class="hint" style="margin:6px 2px 10px">Prépare ta graine, puis ouvre la carte sur <b>Chunkbase</b> (site externe) déjà réglée sur ta version, ta dimension et tes coordonnées. Les <b>chunks à slimes</b> et les conversions de coordonnées sont calculés directement dans l'app, hors-ligne. Les biomes et les structures, eux, demandent Chunkbase.</p>
+      <section class="panel">
+        <label class="field">Graine (nombre ou texte)
+          <input id="sd-text" type="text" inputmode="text" placeholder="Ex. 123456789 ou mon monde" value="${esc(sd.text)}" autocomplete="off" autocapitalize="off" spellcheck="false" /></label>
+        <label class="field">Version
+          <select id="sd-platform">${SEED.PLATFORMS.map((p) => `<option value="${p}" ${p === sd.platform ? 'selected' : ''}>${esc(PLATFORM_LABEL(p))}</option>`).join('')}</select></label>
+        <label class="field">Dimension
+          <select id="sd-dim">${SEED.DIMENSIONS.map((d) => `<option value="${d}" ${d === sd.dimension ? 'selected' : ''}>${esc(DIM_LABEL[d])}</option>`).join('')}</select></label>
+        <div class="two">
+          <label class="field">X<input id="sd-x" type="number" inputmode="numeric" step="1" value="${esc(sd.x)}" /></label>
+          <label class="field">Z<input id="sd-z" type="number" inputmode="numeric" step="1" value="${esc(sd.z)}" /></label>
+        </div>
+        <p class="hint" style="margin:10px 0 0">Version : les versions plus récentes que 1.21 (26.x) ne sont pas dans la liste ; choisis 1.21 puis règle la version exacte sur le site si besoin.</p>
+      </section>
+      <div id="seed-out" style="margin-top:14px">${seedOutputs()}</div>
+
+      <h2 class="section">Mes graines</h2>
+      <section class="panel">
+        <label class="field">Nom<input id="sd-name" type="text" maxlength="60" placeholder="Ex. Monde survie" value="${esc(sd.name)}" /></label>
+        <div class="toolbar"><button class="btn small" data-action="seed-save">Enregistrer cette graine</button></div>
+        <div id="seed-saved" style="margin-top:12px">${seedSavedList()}</div>
+        <div class="toolbar">
+          <button class="btn ghost small" data-action="seeds-export" ${sd.saved.length ? '' : 'disabled'}>Copier mes graines</button>
+          <button class="btn ghost small" data-action="seeds-import-toggle">Importer</button>
+        </div>
+        ${sd.exportText ? `<textarea class="area" readonly rows="4" aria-label="Mes graines à copier">${esc(sd.exportText)}</textarea>` : ''}
+        ${sd.importOpen ? `<textarea id="seed-imp" class="area" rows="4" placeholder="Colle ici les graines copiées"></textarea><button class="btn small" data-action="seeds-import">Valider l'import</button>` : ''}
+      </section>
+
+      <h2 class="section">Autres outils Chunkbase</h2>
+      <section class="panel">
+        <div class="chips">${TOOLS.map(([t, label]) => `<a class="chip chipbtn" href="${esc(SEED.chunkbaseUrl({ tool: t }))}" target="_blank" rel="noopener noreferrer">${esc(label)} ↗</a>`).join('')}</div>
+        <p class="hint" style="margin:8px 0 0">Ces outils s'ouvrent sans réglages : copie ta graine ci-dessus, puis colle-la sur le site.</p>
+      </section>
+      <p class="disclaimer">Chunkbase est un site indépendant : Grimoire n'est ni affilié à lui ni connecté par un accès officiel, il prépare seulement un lien. Le format du lien vient d'un exemple partagé et peut changer ; si la carte ne s'ouvre pas réglée, saisis la graine sur le site (bouton « Copier la graine »). Calculs de slimes : Java Edition, algorithme du wiki.</p>`;
+  }
+
+  function refreshSeedOutputs() {
+    const out = document.getElementById('seed-out');
+    if (out) { out.innerHTML = seedOutputs(); drawSlime(); }
+  }
+
+  function copyText(text, okMsg) {
+    const sd = state.seed;
+    const done = (m) => { sd.msg = m; if (state.tab === 'seed') refreshSeedOutputs(); };
+    if (navigator.clipboard && navigator.clipboard.writeText) navigator.clipboard.writeText(text).then(() => done(okMsg)).catch(() => done('Copie impossible : sélectionne le texte à la main.'));
+    else done('Copie impossible : sélectionne le texte à la main.');
+  }
+  function importSeeds(text) {
+    const sd = state.seed;
+    let raw;
+    try { raw = JSON.parse(text); } catch (e) { sd.msg = 'Texte illisible : colle exactement ce qu\'a copié « Copier mes graines ».'; return; }
+    const list = (Array.isArray(raw) ? raw : []).map(sanitizeSeedEntry).filter((e) => e && e.text);
+    let added = 0;
+    for (const e of list) {
+      if (sd.saved.length >= 50) break;
+      if (!sd.saved.some((o) => o.text === e.text && o.platform === e.platform && o.dimension === e.dimension && o.x === e.x && o.z === e.z)) { sd.saved.push(e); added++; }
+    }
+    saveSeedState();
+    sd.importOpen = false;
+    sd.msg = added ? `${added} graine${added > 1 ? 's' : ''} importée${added > 1 ? 's' : ''}.` : 'Aucune nouvelle graine à importer.';
+  }
+
   // ---------- Rendu global ----------
   function render() {
     if (state.tab === 'home') {
@@ -831,6 +1063,9 @@
     } else if (state.tab === 'enchant') {
       const c = state.cat ? cat(state.cat) : null;
       APP.innerHTML = c ? renderCategory(c) : renderEquipmentList();
+    } else if (state.tab === 'seed') {
+      APP.innerHTML = renderSeed();
+      drawSlime();
     } else if (state.tab === 'farms') {
       APP.innerHTML = renderFarms();
     } else if (state.tab === 'structures') {
@@ -868,6 +1103,32 @@
     else if (a === 'back') { state.cat = null; state.sel = {}; state.result = null; }
     else if (a === 'struct-open') { state.struct.id = el.dataset.id; state.struct.q = ''; window.scrollTo({ top: 0 }); }
     else if (a === 'struct-back') { state.struct.id = null; window.scrollTo({ top: 0 }); }
+    else if (a === 'seed-embed') { state.seed.embed = !state.seed.embed; }
+    else if (a === 'seed-copy-link') { copyText(seedUrl('seed-map'), 'Lien copié.'); return; }
+    else if (a === 'seed-copy-seed') { const ps = SEED.parseSeed(state.seed.text); if (ps.seed !== null) copyText(ps.seed.toString(), 'Graine copiée.'); return; }
+    else if (a === 'slime-pan') {
+      if (el.dataset.reset) state.seed.pan = [0, 0];
+      else state.seed.pan = [state.seed.pan[0] + Number(el.dataset.dx), state.seed.pan[1] + Number(el.dataset.dz)];
+      refreshSeedOutputs(); return;
+    }
+    else if (a === 'seed-save') {
+      const e = sanitizeSeedEntry({ name: state.seed.name, text: state.seed.text, platform: state.seed.platform, dimension: state.seed.dimension, x: seedNum(state.seed.x) ?? 0, z: seedNum(state.seed.z) ?? 0 });
+      if (state.seed.saved.length >= 50) state.seed.msg = 'Limite de 50 graines atteinte : supprime-en une.';
+      else if (!e.text) state.seed.msg = 'Entre d\'abord une graine à enregistrer.';
+      else { state.seed.saved.unshift(e); state.seed.name = ''; state.seed.msg = ''; saveSeedState(); }
+    }
+    else if (a === 'seed-load') {
+      const e = state.seed.saved.find((x) => x.id === el.dataset.id);
+      if (e) { Object.assign(state.seed, { text: e.text, platform: e.platform, dimension: e.dimension, x: String(e.x), z: String(e.z), pan: [0, 0], picked: null, msg: '' }); saveSeedState(); window.scrollTo({ top: 0 }); }
+    }
+    else if (a === 'seed-del') { if (window.confirm('Supprimer cette graine ?')) { state.seed.saved = state.seed.saved.filter((x) => x.id !== el.dataset.id); saveSeedState(); } }
+    else if (a === 'seeds-export') {
+      state.seed.exportText = JSON.stringify(state.seed.saved.map(({ name, text, platform, dimension, x, z }) => ({ name, text, platform, dimension, x, z })));
+      state.seed.importOpen = false; state.seed.msg = '';
+      if (navigator.clipboard && navigator.clipboard.writeText) navigator.clipboard.writeText(state.seed.exportText).then(() => { state.seed.msg = 'Graines copiées. Colle-les dans une note pour les garder.'; render(); }).catch(() => {});
+    }
+    else if (a === 'seeds-import-toggle') { state.seed.importOpen = !state.seed.importOpen; state.seed.exportText = ''; state.seed.msg = ''; }
+    else if (a === 'seeds-import') { const t = document.getElementById('seed-imp'); importSeeds(t ? t.value : ''); }
     else if (a === 'go-farm') { selectTab('farms'); state.farm.id = el.dataset.id; state.farm.q = ''; state.farm.playing = null; window.scrollTo({ top: 0 }); }
     else if (a === 'farm-open') { state.farm.id = el.dataset.id; state.farm.q = ''; state.farm.playing = null; state.farm.adding = false; state.farm.msg = ''; window.scrollTo({ top: 0 }); }
     else if (a === 'farm-back') { state.farm.id = null; state.farm.playing = null; state.farm.adding = false; state.farm.msg = ''; window.scrollTo({ top: 0 }); }
@@ -941,6 +1202,17 @@
     if (e.target.id === 'home-q') {
       state.homeQ = e.target.value;
       document.getElementById('home-body').innerHTML = accueilBody();
+    } else if (e.target.id === 'sd-text' || e.target.id === 'sd-platform' || e.target.id === 'sd-dim' || e.target.id === 'sd-x' || e.target.id === 'sd-z') {
+      const sd = state.seed;
+      if (e.target.id === 'sd-text') sd.text = e.target.value;
+      else if (e.target.id === 'sd-platform') sd.platform = SEED.PLATFORMS.includes(e.target.value) ? e.target.value : sd.platform;
+      else if (e.target.id === 'sd-dim') sd.dimension = SEED.DIMENSIONS.includes(e.target.value) ? e.target.value : sd.dimension;
+      else if (e.target.id === 'sd-x') sd.x = e.target.value;
+      else sd.z = e.target.value;
+      sd.pan = [0, 0]; sd.picked = null; sd.msg = '';
+      saveSeedState();
+      refreshSeedOutputs();
+    } else if (e.target.id === 'sd-name') { state.seed.name = e.target.value;
     } else if (e.target.id === 'farm-q') {
       state.farm.q = e.target.value;
       document.getElementById('farm-body').innerHTML = farmBody();
@@ -958,6 +1230,20 @@
 
   document.querySelectorAll('.tab').forEach((b) => b.addEventListener('click', () => setTab(b.dataset.tab)));
   APP.addEventListener('error', (e) => { if (e.target && e.target.classList && e.target.classList.contains('thumb')) e.target.style.display = 'none'; }, true);
+  APP.addEventListener('click', (e) => {
+    if (!e.target || e.target.id !== 'slime-cv') return;
+    const ps = SEED.parseSeed(state.seed.text);
+    if (ps.kind === 'empty') return;
+    const r = e.target.getBoundingClientRect();
+    const i = Math.min(SLIME_N - 1, Math.max(0, Math.floor(((e.clientX - r.left) / r.width) * SLIME_N)));
+    const j = Math.min(SLIME_N - 1, Math.max(0, Math.floor(((e.clientY - r.top) / r.height) * SLIME_N)));
+    const [ocx, ocz] = slimeOrigin();
+    const cx = ocx - (SLIME_N - 1) / 2 + i, cz = ocz - (SLIME_N - 1) / 2 + j;
+    state.seed.picked = { cx, cz, slime: SEED.isSlimeChunk(ps.seed, cx, cz) };
+    drawSlime();
+    const info = document.getElementById('slime-info');
+    if (info) info.innerHTML = slimeInfoText();
+  });
   const homeLink = document.getElementById('homeLink');
   if (homeLink) homeLink.addEventListener('click', (e) => { e.preventDefault(); setTab('home'); });
 
