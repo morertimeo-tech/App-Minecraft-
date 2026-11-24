@@ -36,6 +36,21 @@ EXPORT int *world_biomes(int scale, int x, int z, int w, int h, int y) {
     return buf;
 }
 
+/* Dézoom au-delà de l'échelle 256 : un échantillon tous les `stride` cellules de 256 blocs. */
+EXPORT int *world_biomes_sparse(int stride, int x, int z, int w, int h, int y) {
+    static int *buf = 0; static size_t cap = 0; static int *tmp = 0;
+    size_t n = (size_t)w * (size_t)h;
+    if (n > cap) { buf = (int *)malloc(n * sizeof(int)); cap = n; }
+    if (!tmp) tmp = (int *)malloc(getMinCacheSize(&G, 256, 1, 1, 1) * sizeof(int) + 64);
+    Range r; r.scale = 256; r.sx = 1; r.sz = 1; r.y = y; r.sy = 1;
+    for (int j = 0; j < h; j++)
+        for (int i = 0; i < w; i++) {
+            r.x = (x + i) * stride; r.z = (z + j) * stride;
+            buf[j * w + i] = genBiomes(&G, tmp, r) == 0 ? tmp[0] : 0;
+        }
+    return buf;
+}
+
 EXPORT int world_biome_at(int x, int z, int y) { return getBiomeAt(&G, 1, x, y, z); }
 
 EXPORT int struct_supported(int type) { StructureConfig c; return getStructureConfig(type, MC, &c); }

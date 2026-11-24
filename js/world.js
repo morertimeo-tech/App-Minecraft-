@@ -109,6 +109,11 @@
         if (!p) return null;
         return new Int32Array(mem().buffer.slice(p, p + w * h * 4));
       },
+      /** Dézoom extrême : un échantillon tous les `stride` × 256 blocs. */
+      biomesSparse(stride, bx, bz, w, h, y) {
+        const p = x.world_biomes_sparse(stride, bx, bz, w, h, y == null ? 64 : y);
+        return new Int32Array(mem().buffer.slice(p, p + w * h * 4));
+      },
       biomeAt(bx, bz, y) { return x.world_biome_at(bx, bz, y == null ? 256 : y); },
       /** Positions [x, z] des structures dans [x0,x1]x[z0,z1] (blocs). */
       structures(type, x0, z0, x1, z1) {

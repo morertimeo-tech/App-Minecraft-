@@ -956,7 +956,8 @@
     if (d === 0) l.push(WORLD.STRONGHOLD);
     return l;
   };
-  const KMIN = 0.004, KMAX = 4;                       // pixels de carte par bloc : de ≈ 130 000 blocs à 1/4 de bloc par pixel
+  const LEVELS = [1, 4, 16, 64, 256, 1024, 4096, 16384, 65536, 262144, 1048576];   // blocs par cellule ; au-delà de 256 : échantillonnage espacé
+  const KMIN_FAR = 0.0000045, KMIN_NEAR = 0.004, KMAX = 4;                         // px de carte par bloc                       // pixels de carte par bloc : de ≈ 130 000 blocs à 1/4 de bloc par pixel
   const viewBlocks = () => MAP_SIZE / view.k;
 
   function mapSection() {
@@ -966,7 +967,7 @@
     if (coordMode() === 'invalid') return '<p class="hint">Entre des coordonnées valides (X et Z) pour centrer la carte.</p>';
     const L = sd.layers;
     return `
-      <div class="chips" role="group" aria-label="Zoom">${ZOOMS.map(([s, name, w]) => `<button class="chip chipbtn ${sd.zoom === s ? 'on' : ''}" data-action="map-zoom" data-z="${s}" aria-pressed="${sd.zoom === s}">${name} <small>${w}</small></button>`).join('')}</div>
+      <div class="chips" role="group" aria-label="Zoom">${ZOOMS.map(([s, name, w]) => `<button class="chip chipbtn ${sd.zoom === s ? 'on' : ''}" data-action="map-zoom" data-z="${s}" aria-pressed="${sd.zoom === s}">${name} <small>${w}</small></button>`).join('')}<button class="chip chipbtn" data-action="map-zoom" data-z="max">Maximum <small>≈ tout le monde</small></button></div>
       <div class="mapwrap"><canvas id="seed-cv" class="mapcv" width="${MAP_SIZE}" height="${MAP_SIZE}" aria-label="Carte du monde"></canvas><div class="mapzoom"><button data-action="map-zstep" data-d="-1" aria-label="Zoomer" ${sd.zoom === ZOOMS[0][0] ? 'disabled' : ''}>+</button><button data-action="map-zstep" data-d="1" aria-label="Dézoomer" ${sd.zoom === ZOOMS[ZOOMS.length - 1][0] ? 'disabled' : ''}>−</button></div><div id="map-status" class="mapstatus">Chargement du moteur de carte…</div></div>
       <div class="toolbar" style="margin-top:8px">
         <button class="btn ghost small" data-action="map-pan" data-dx="-1" data-dz="0" aria-label="Gauche">◀</button>
@@ -1004,20 +1005,22 @@
   const biomeCols = {};
   const iconImgs = {};
 
+  // Dézoom maximal (≈ 70 millions de blocs : tout le monde jouable) : Overworld 1.18+ ; ailleurs, limite plus proche
+  function kmin() { const p = genParams(); return p && p.dim === 0 && p.ver.mc >= 22 ? KMIN_FAR : KMIN_NEAR; }
   function levelFor(k) {
-    let best = ZOOMS[0][0], bd = Infinity;
-    for (const [S] of ZOOMS) { const d = Math.abs(Math.log((k * S) / 2 / 1.4)); if (d < bd) { bd = d; best = S; } }
+    let best = LEVELS[0], bd = Infinity;
+    for (const S of LEVELS) { const d = Math.abs(Math.log((k * S) / 2 / 1.4)); if (d < bd) { bd = d; best = S; } }
     return best;
   }
   function syncZoomUI() {
     const S = state.seed.zoom;
-    document.querySelectorAll('[data-action="map-zoom"]').forEach((b) => { const on = Number(b.dataset.z) === S; b.classList.toggle('on', on); b.setAttribute('aria-pressed', on); });
+    document.querySelectorAll('[data-action="map-zoom"]').forEach((b) => { const on = b.dataset.z === 'max' ? view.k <= kmin() * 1.5 : Number(b.dataset.z) === S && view.k > kmin() * 1.5; b.classList.toggle('on', on); b.setAttribute('aria-pressed', on); });
     const zin = document.querySelector('[data-action="map-zstep"][data-d="-1"]'), zout = document.querySelector('[data-action="map-zstep"][data-d="1"]');
     if (zin) zin.disabled = view.k >= KMAX - 1e-9;
-    if (zout) zout.disabled = view.k <= KMIN + 1e-9;
+    if (zout) zout.disabled = view.k <= kmin() * 1.0001;
   }
   function setK(k) {
-    view.k = Math.min(KMAX, Math.max(KMIN, k));
+    view.k = Math.min(KMAX, Math.max(kmin(), k));
     const S = levelFor(view.k);
     if (S !== state.seed.zoom) { state.seed.zoom = S; state.seed.picked = null; }
     syncZoomUI();
@@ -1029,7 +1032,7 @@
     const k0 = view.k, t0 = performance.now(), dur = ms || 200;
     const step = (now) => {
       const f = Math.min(1, (now - t0) / dur), e = 1 - Math.pow(1 - f, 3);
-      setK(k0 * Math.pow(Math.min(KMAX, Math.max(KMIN, target)) / k0, e));
+      setK(k0 * Math.pow(Math.min(KMAX, Math.max(kmin(), target)) / k0, e));
       schedulePaint(); pump(); scheduleSettle();
       if (f < 1) tween = requestAnimationFrame(step);
     };
@@ -1061,7 +1064,9 @@
     }
     let slime = false;
     if (sd.layers.slime && p.dim === 0) { if (sd.zoom > 16) notes.push('Chunks à slimes : zoome (Bloc, Détail ou Moyen) pour les voir.'); else slime = true; }
-    return { ids, notes, slime, stronghold: !!(sd.layers.structs.stronghold && p.dim === 0) };
+    let stronghold = !!(sd.layers.structs.stronghold && p.dim === 0);
+    if (stronghold && viewB > 150000) { stronghold = false; notes.push('Forteresses : zoome pour les afficher (trop proches les unes des autres à cette échelle).'); }
+    return { ids, notes, slime, stronghold };
   }
 
   function buildTile(w, p, plan, S, tx, tz) {
@@ -1069,7 +1074,8 @@
     let t = tiles.get(key);
     const bx0 = tx * TILE, bz0 = tz * TILE, X0 = bx0 * S, Z0 = bz0 * S, X1 = X0 + TILE * S - 1, Z1 = Z0 + TILE * S - 1;
     if (!t) {
-      const ids = w.biomes(S, bx0, bz0, TILE, TILE, p.dim === 0 ? (S === 1 ? 256 : 64) : (S === 1 ? 60 : 15)) || new Int32Array(TILE * TILE);
+      const yy = p.dim === 0 ? (S === 1 ? 256 : 64) : (S === 1 ? 60 : 15);
+      const ids = (S > 256 ? w.biomesSparse(S / 256, bx0, bz0, TILE, TILE, yy) : w.biomes(S, bx0, bz0, TILE, TILE, yy)) || new Int32Array(TILE * TILE);
       const cv = document.createElement('canvas'); cv.width = cv.height = TILE;
       const cx = cv.getContext('2d'); const img = cx.createImageData(TILE, TILE);
       for (let i = 0; i < ids.length; i++) {
@@ -1168,7 +1174,7 @@
     ctx.fillStyle = '#1d1830'; ctx.fillRect(0, 0, MAP_SIZE, MAP_SIZE);
     const plan = mapState.plan || { ids: [], slime: false };
     const markers = [];
-    const levelsDrawn = ZOOMS.map((q) => q[0]).filter((L) => L !== S && levelCount[L] > 0 && Math.abs(Math.log(L / S) / Math.log(4)) <= 2)
+    const levelsDrawn = LEVELS.filter((L) => L !== S && levelCount[L] > 0 && Math.abs(Math.log(L / S) / Math.log(4)) <= 2)
       .sort((a, b) => Math.abs(Math.log(b / S)) - Math.abs(Math.log(a / S)));      // d'abord les plus éloignés, en fond
     const drawLevel = (L, collect) => {
       const tb = TILE * L, tw = tb * k;
@@ -1191,6 +1197,10 @@
     const missing = drawLevel(S, true);
     if (plan.stronghold && mapState.sh && mapState.sh.key === p.key) for (const m of mapState.sh.list) markers.push({ id: 'stronghold', x: m[0], z: m[1] });
     if (p.dim === 0 && mapState.spawn && mapState.spawn.key === p.key) markers.push({ id: 'spawn', x: mapState.spawn.pos[0], z: mapState.spawn.pos[1] });
+    if (viewB > 100000) {                                  // limite du monde jouable (±29 999 984 blocs)
+      const B = 29999984, bx0 = (-B - X0) * k, bz0 = (-B - Z0) * k, bw = 2 * B * k;
+      ctx.lineWidth = 2; ctx.strokeStyle = 'rgba(255,85,85,.9)'; ctx.strokeRect(bx0, bz0, bw, bw);
+    }
     const vis = [];
     for (const m of markers) {
       const px = (m.x - X0) * k, py = (m.z - Z0) * k;
@@ -1458,8 +1468,8 @@
     else if (a === 'seed-copy-link') { copyText(seedUrl('seed-map'), 'Lien copié.'); return; }
     else if (a === 'seed-copy-seed') { const ps = SEED.parseSeed(state.seed.text); if (ps.seed !== null) copyText(ps.seed.toString(), 'Graine copiée.'); return; }
     else if (a === 'map-zoom') {
-      const z = Number(el.dataset.z);
-      if (ZOOMS.some((q) => q[0] === z)) tweenK(2 / z, 220);
+      if (el.dataset.z === 'max') tweenK(kmin(), 700);
+      else { const z = Number(el.dataset.z); if (ZOOMS.some((q) => q[0] === z)) tweenK(2 / z, 220); }
       return;
     }
     else if (a === 'seed-random') {
