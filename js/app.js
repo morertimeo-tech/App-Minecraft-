@@ -989,6 +989,224 @@
       <div id="map-found"></div>`;
   }
 
+  // ---------- Génération par tuiles ----------
+  // La carte est découpée en tuiles de 32 × 32 cellules, générées en arrière-plan bien au-delà de l'écran
+  // (PREFETCH tuiles de marge), de la plus proche du centre vers la plus lointaine. Pendant qu'on fait glisser
+  // la carte, l'image se déplace en direct et la génération continue dans la direction du mouvement.
+  const TILE = 32, PREFETCH = 3, MAX_TILES = 900;
+  const tiles = new Map();                       // 'échelle|tx|tz' -> tuile (biomes, structures, slimes)
+  let tileGen = '';                              // identifiant du monde pour lequel le cache est valable
+  let engineKey = '';
+  let pumpTimer = null, paintReq = 0, settleTimer = null, mapReady = false;
+  const view = { cx: 0, cz: 0 };                 // centre de la vue (blocs, peut être décimal)
+  const biomeCols = {};
+  const iconImgs = {};
+
+  function genParams() {
+    const sd = state.seed, ps = SEED.parseSeed(sd.text);
+    if (ps.kind === 'empty') return null;
+    const ver = WORLD.VERSIONS.find((v) => v.key === sd.platform) || WORLD.VERSIONS[0];
+    const dim = DIM_ID[sd.dimension];
+    return { ver, dim, seed: ps.seed, key: `${ver.mc}|${ps.seed}|${dim}` };
+  }
+  function ensureEngine(w, p) {
+    if (engineKey !== p.key) { w.init(p.ver.mc, p.seed, p.dim, false); engineKey = p.key; }
+  }
+  const mapIsLive = () => !!document.getElementById('seed-cv') && mapReady;
+  const syncView = () => { const b = mapState.base || [0, 0]; view.cx = b[0] + state.seed.pan[0]; view.cz = b[1] + state.seed.pan[1]; };
+  const biomeCol = (w, id) => biomeCols[id] || (biomeCols[id] = w.biomeColor(id));
+
+  function layerPlan(w, p) {
+    const sd = state.seed, viewB = sd.zoom * MAP_CELLS, ids = [], notes = [];
+    for (const s of mapStructList()) {
+      if (s.id === 'stronghold' || !sd.layers.structs[s.id]) continue;
+      if (!w.structureSupported(s.id)) { notes.push(`${s.fr} : n'existe pas dans cette version.`); continue; }
+      const reg = w.structureRegion(s.id) || 16;
+      if (Math.pow(viewB / reg, 2) > 5000) { notes.push(`${s.fr} : zoome pour les afficher (trop de positions à cette échelle).`); continue; }
+      ids.push(s.id);
+    }
+    let slime = false;
+    if (sd.layers.slime && p.dim === 0) { if (sd.zoom > 16) notes.push('Chunks à slimes : zoome (Bloc, Détail ou Moyen) pour les voir.'); else slime = true; }
+    return { ids, notes, slime, stronghold: !!(sd.layers.structs.stronghold && p.dim === 0) };
+  }
+
+  function buildTile(w, p, plan, S, tx, tz) {
+    const key = `${S}|${tx}|${tz}`;
+    let t = tiles.get(key);
+    const bx0 = tx * TILE, bz0 = tz * TILE, X0 = bx0 * S, Z0 = bz0 * S, X1 = X0 + TILE * S - 1, Z1 = Z0 + TILE * S - 1;
+    if (!t) {
+      const ids = w.biomes(S, bx0, bz0, TILE, TILE, p.dim === 0 ? (S === 1 ? 256 : 64) : (S === 1 ? 60 : 15)) || new Int32Array(TILE * TILE);
+      const cv = document.createElement('canvas'); cv.width = cv.height = TILE;
+      const cx = cv.getContext('2d'); const img = cx.createImageData(TILE, TILE);
+      for (let i = 0; i < ids.length; i++) {
+        const c = biomeCol(w, ids[i]);
+        img.data[i * 4] = c[0]; img.data[i * 4 + 1] = c[1]; img.data[i * 4 + 2] = c[2]; img.data[i * 4 + 3] = 255;
+      }
+      cx.putImageData(img, 0, 0);
+      t = { S, tx, tz, ids, canvas: cv, mk: {}, slime: undefined };
+      tiles.set(key, t);
+    }
+    for (const id of plan.ids) if (!(id in t.mk)) t.mk[id] = w.structures(id, X0, Z0, X1, Z1);
+    if (plan.slime && t.slime === undefined) {
+      const n = (TILE * S) / 16, cv = document.createElement('canvas'); cv.width = cv.height = n;
+      const cx = cv.getContext('2d'); const img = cx.createImageData(n, n);
+      for (let j = 0; j < n; j++) for (let i = 0; i < n; i++) {
+        if (!w.slime(X0 / 16 + i, Z0 / 16 + j)) continue;
+        const k = (j * n + i) * 4; img.data[k] = 100; img.data[k + 1] = 255; img.data[k + 2] = 90; img.data[k + 3] = 160;
+      }
+      cx.putImageData(img, 0, 0); t.slime = cv;
+    }
+    return t;
+  }
+
+  // Prochaine tuile à générer : la plus proche du centre parmi celles de la zone visible + marge
+  function nextWork(plan) {
+    const S = state.seed.zoom, tb = TILE * S, half = (MAP_CELLS * S) / 2;
+    const tx0 = Math.floor((view.cx - half) / tb) - PREFETCH, tx1 = Math.floor((view.cx + half) / tb) + PREFETCH;
+    const tz0 = Math.floor((view.cz - half) / tb) - PREFETCH, tz1 = Math.floor((view.cz + half) / tb) + PREFETCH;
+    let best = null, bd = Infinity;
+    for (let tz = tz0; tz <= tz1; tz++) for (let tx = tx0; tx <= tx1; tx++) {
+      const t = tiles.get(`${S}|${tx}|${tz}`);
+      const complete = t && plan.ids.every((id) => id in t.mk) && (!plan.slime || t.slime !== undefined);
+      if (complete) continue;
+      const d = Math.hypot((tx + 0.5) * tb - view.cx, (tz + 0.5) * tb - view.cz);
+      if (d < bd) { bd = d; best = [tx, tz]; }
+    }
+    return best;
+  }
+  function strongholdNeed() {
+    const half = (MAP_CELLS * state.seed.zoom) / 2 + PREFETCH * TILE * state.seed.zoom;
+    const far = Math.hypot(Math.abs(view.cx) + half, Math.abs(view.cz) + half);
+    return far < 3200 ? 3 : far < 6200 ? 9 : far < 9200 ? 19 : far < 15000 ? 35 : 128;
+  }
+
+  function pump() { if (!pumpTimer) pumpTimer = setTimeout(pumpStep, 0); }
+  async function pumpStep() {
+    pumpTimer = null;
+    if (!mapIsLive()) return;
+    let w;
+    try { w = await worldEngine(); } catch (e) { return; }
+    const p = genParams();
+    if (!p || !mapIsLive()) return;
+    ensureEngine(w, p);
+    const plan = layerPlan(w, p);
+    mapState.plan = plan;
+    const t0 = performance.now();
+    let did = false, more = false;
+    try {
+      while (performance.now() - t0 < 12) {
+        const n = nextWork(plan);
+        if (!n) break;
+        buildTile(w, p, plan, state.seed.zoom, n[0], n[1]);
+        did = true;
+      }
+      more = !!nextWork(plan);
+      if (!more && plan.stronghold) {                  // forteresses : calculées par anneaux, seulement ce qui peut être visible
+        const need = strongholdNeed();
+        if (!mapState.sh || mapState.sh.key !== p.key || mapState.sh.n < need) { mapState.sh = { key: p.key, n: need, list: w.strongholds(need) }; did = true; }
+      }
+      if (!more && p.dim === 0 && (!mapState.spawn || mapState.spawn.key !== p.key)) { mapState.spawn = { key: p.key, pos: w.spawn() }; did = true; }
+    } catch (e) {
+      const st = document.getElementById('map-status');
+      if (st) { st.textContent = 'Erreur de calcul : ' + (e && e.message ? e.message : e); st.style.display = 'block'; }
+      return;
+    }
+    if (tiles.size > MAX_TILES) {                       // on oublie les tuiles les plus lointaines
+      const arr = [...tiles.entries()].map(([k, t]) => [k, Math.hypot((t.tx + 0.5) * TILE * t.S - view.cx, (t.tz + 0.5) * TILE * t.S - view.cz)]).sort((a, b) => b[1] - a[1]);
+      for (let i = 0; i < arr.length - Math.floor(MAX_TILES * 0.7); i++) tiles.delete(arr[i][0]);
+    }
+    if (did) schedulePaint();
+    if (more) pump(); else scheduleSettle();
+  }
+
+  function schedulePaint() { if (!paintReq) paintReq = requestAnimationFrame(() => { paintReq = 0; paint(); }); }
+  function scheduleSettle() { clearTimeout(settleTimer); settleTimer = setTimeout(settleMap, 120); }
+
+  function paint() {
+    const cv = document.getElementById('seed-cv');
+    if (!cv || !mapReady) return;
+    const sd = state.seed, S = sd.zoom, p = genParams();
+    if (!p) return;
+    const ctx = cv.getContext('2d');
+    const viewB = S * MAP_CELLS, X0 = view.cx - viewB / 2, Z0 = view.cz - viewB / 2;
+    const k = MAP_SIZE / viewB;                               // pixels par bloc
+    const tb = TILE * S, tw = TILE * MAP_PX;
+    ctx.imageSmoothingEnabled = false;
+    ctx.fillStyle = '#1d1830'; ctx.fillRect(0, 0, MAP_SIZE, MAP_SIZE);
+    const plan = mapState.plan || { ids: [], slime: false };
+    let missing = false;
+    const markers = [];
+    const tx0 = Math.floor(X0 / tb), tx1 = Math.floor((X0 + viewB) / tb), tz0 = Math.floor(Z0 / tb), tz1 = Math.floor((Z0 + viewB) / tb);
+    for (let tz = tz0; tz <= tz1; tz++) for (let tx = tx0; tx <= tx1; tx++) {
+      const t = tiles.get(`${S}|${tx}|${tz}`);
+      if (!t) { missing = true; continue; }
+      const dx = Math.floor((tx * tb - X0) * k), dz = Math.floor((tz * tb - Z0) * k);
+      const dw = Math.ceil((tx * tb - X0) * k + tw) - dx, dh = Math.ceil((tz * tb - Z0) * k + tw) - dz;
+      if (sd.layers.biomes) ctx.drawImage(t.canvas, dx, dz, dw, dh);
+      if (plan.slime && t.slime) ctx.drawImage(t.slime, dx, dz, dw, dh);
+      for (const id of plan.ids) { const l = t.mk[id]; if (l) for (const m of l) markers.push({ id, x: m[0], z: m[1] }); }
+    }
+    if (plan.stronghold && mapState.sh && mapState.sh.key === p.key) for (const m of mapState.sh.list) markers.push({ id: 'stronghold', x: m[0], z: m[1] });
+    if (p.dim === 0 && mapState.spawn && mapState.spawn.key === p.key) markers.push({ id: 'spawn', x: mapState.spawn.pos[0], z: mapState.spawn.pos[1] });
+    const vis = [];
+    for (const m of markers) {
+      const px = (m.x - X0) * k, py = (m.z - Z0) * k;
+      if (px < -12 || py < -12 || px > MAP_SIZE + 12 || py > MAP_SIZE + 12) continue;
+      vis.push(m);
+      ctx.beginPath(); ctx.arc(px, py, 9, 0, Math.PI * 2);
+      ctx.fillStyle = markerColor(m.id); ctx.fill();
+      ctx.lineWidth = 2; ctx.strokeStyle = '#000'; ctx.stroke();
+      const img = iconImgs[m.id];
+      if (img) ctx.drawImage(img, px - 7, py - 7, 14, 14);
+      if (m.id === 'spawn') { ctx.beginPath(); ctx.arc(px, py, 11, 0, Math.PI * 2); ctx.lineWidth = 2; ctx.strokeStyle = '#fff'; ctx.stroke(); }
+    }
+    mapState.markers = vis;
+    mapState.geom = { X0, Z0, S, cx: view.cx, cz: view.cz, size: viewB };
+    const st = document.getElementById('map-status');
+    if (st) { st.textContent = 'Calcul de la carte…'; st.style.display = missing ? 'block' : 'none'; }
+  }
+
+  // Légende des biomes, liste des structures et notes : mises à jour quand la carte se calme
+  function settleMap() {
+    if (!mapIsLive() || !mapState.geom || !worldP) return;
+    worldP.then((w) => {
+      const p = genParams();
+      if (!p || !mapIsLive()) return;
+      ensureEngine(w, p);
+      const g = mapState.geom, S = g.S, counts = {};
+      let total = 0;
+      for (const t of tiles.values()) {
+        if (t.S !== S) continue;
+        const bx = t.tx * TILE, bz = t.tz * TILE;
+        if ((bx + TILE) * S < g.X0 || bx * S > g.X0 + g.size || (bz + TILE) * S < g.Z0 || bz * S > g.Z0 + g.size) continue;
+        for (let j = 0; j < TILE; j++) {
+          const zz = (bz + j) * S; if (zz < g.Z0 || zz >= g.Z0 + g.size) continue;
+          for (let i = 0; i < TILE; i++) {
+            const xx = (bx + i) * S; if (xx < g.X0 || xx >= g.X0 + g.size) continue;
+            const id = t.ids[j * TILE + i]; counts[id] = (counts[id] || 0) + 1; total++;
+          }
+        }
+      }
+      const nb = document.getElementById('map-notes');
+      if (nb) nb.innerHTML = ((mapState.plan && mapState.plan.notes) || []).map(esc).join('<br>');
+      const bl = document.getElementById('map-biomes');
+      if (bl && total) {
+        const rows = Object.keys(counts).map((id) => [Number(id), counts[id]]).sort((a, b) => b[1] - a[1]).slice(0, 12);
+        bl.innerHTML = rows.map(([id, n]) => {
+          const en = w.biomeName(id); const c = biomeCol(w, id);
+          return `<div class="biorow"><i class="sw" style="background:rgb(${c[0]},${c[1]},${c[2]})"></i>${biomeIconHtml(en)}<span>${esc(WORLD.BIOMES_FR[en] || en || 'Biome ' + id)}</span><b>${Math.round((n / total) * 100) || '<1'} %</b></div>`;
+        }).join('');
+      }
+      const fl = document.getElementById('map-found');
+      if (fl) {
+        const names = mapState.names;
+        const list = mapState.markers.map((m) => ({ ...m, d: Math.round(Math.hypot(m.x - g.cx, m.z - g.cz)) })).sort((a, b) => a.d - b.d).slice(0, 40);
+        fl.innerHTML = list.length ? list.map((m) => `<button class="maprow" data-action="map-goto" data-x="${m.x}" data-z="${m.z}">${mkHtml(m.id)}<b>${esc(m.id === 'spawn' ? "Point d'apparition (approx.)" : names.get(m.id) || '?')}</b><span>X ${m.x} · Z ${m.z}</span><small>${m.d} blocs</small></button>`).join('')
+          : '<p class="hint">Aucune structure cochée dans cette zone. Active une couche ci-dessus ou dézoome.</p>';
+      }
+    }).catch(() => {});
+  }
+
   async function drawMap() {
     const cv = document.getElementById('seed-cv');
     if (!cv) return;
@@ -997,122 +1215,25 @@
     const token = ++mapState.token;
     const status = document.getElementById('map-status');
     const say = (m) => { if (status) { status.textContent = m; status.style.display = m ? 'block' : 'none'; } };
-    say('Calcul de la carte…');
+    say('Chargement du moteur de carte…');
     let w;
     try { w = await worldEngine(); }
     catch (e) { say("Le moteur de carte n'a pas pu se charger : une connexion est nécessaire la première fois."); return; }
-    if (token !== mapState.token) return;
-    await new Promise((r) => setTimeout(r, 20));             // laisse le message s'afficher avant le calcul
     if (token !== mapState.token || document.getElementById('seed-cv') !== cv) return;
-    try {
-      const ver = WORLD.VERSIONS.find((v) => v.key === sd.platform) || WORLD.VERSIONS[0];
-      const dim = DIM_ID[sd.dimension];
-      w.init(ver.mc, ps.seed, dim, false);
-      // centre : coordonnées saisies, sinon le spawn (Overworld) ou 0 ; 0 dans les autres dimensions
-      const skey = ver.mc + '|' + ps.seed;
-      if (dim === 0 && (!mapState.spawn || mapState.spawn.key !== skey)) mapState.spawn = { key: skey, pos: w.spawn() };
-      const [x0, z0] = mode === 'coords' ? seedXZ() : dim === 0 ? mapState.spawn.pos : [0, 0];
-      mapState.base = [x0, z0];
-      const S = sd.zoom, cx = x0 + sd.pan[0], cz = z0 + sd.pan[1];
-      const bx0 = Math.floor(cx / S) - MAP_CELLS / 2, bz0 = Math.floor(cz / S) - MAP_CELLS / 2;
-      const X0 = bx0 * S, Z0 = bz0 * S, X1 = X0 + MAP_CELLS * S - 1, Z1 = Z0 + MAP_CELLS * S - 1;
-      const ids = w.biomes(S, bx0, bz0, MAP_CELLS, MAP_CELLS, dim === 0 ? (S === 1 ? 256 : 64) : (S === 1 ? 60 : 15));   // y = 256 en Overworld : biomes de surface, pas les grottes
-      if (!ids) throw new Error('biomes indisponibles');
-      const ctx = cv.getContext('2d');
-      ctx.imageSmoothingEnabled = false;
-      ctx.fillStyle = '#1d1830'; ctx.fillRect(0, 0, MAP_SIZE, MAP_SIZE);
-      const colors = {}, counts = {};
-      if (sd.layers.biomes) {
-        const off = document.createElement('canvas'); off.width = off.height = MAP_CELLS;
-        const octx = off.getContext('2d'); const img = octx.createImageData(MAP_CELLS, MAP_CELLS);
-        for (let i = 0; i < ids.length; i++) {
-          const id = ids[i];
-          const c = colors[id] || (colors[id] = w.biomeColor(id));
-          img.data[i * 4] = c[0]; img.data[i * 4 + 1] = c[1]; img.data[i * 4 + 2] = c[2]; img.data[i * 4 + 3] = 255;
-        }
-        octx.putImageData(img, 0, 0);
-        ctx.drawImage(off, 0, 0, MAP_SIZE, MAP_SIZE);
-      }
-      for (let i = 0; i < ids.length; i++) counts[ids[i]] = (counts[ids[i]] || 0) + 1;
-      const toPx = (X, Z) => [((X - X0) / (MAP_CELLS * S)) * MAP_SIZE, ((Z - Z0) / (MAP_CELLS * S)) * MAP_SIZE];
-      const notes = [];
-      // chunks à slimes
-      if (sd.layers.slime && dim === 0) {
-        if (S > 16) notes.push('Chunks à slimes : zoome (Détail ou Moyen) pour les voir.');
-        else {
-          ctx.fillStyle = 'rgba(100,255,90,.6)';
-          const c0x = Math.floor(X0 / 16), c1x = Math.floor(X1 / 16), c0z = Math.floor(Z0 / 16), c1z = Math.floor(Z1 / 16);
-          const sz = (16 / (MAP_CELLS * S)) * MAP_SIZE;
-          for (let czz = c0z; czz <= c1z; czz++) for (let cxx = c0x; cxx <= c1x; cxx++) {
-            if (!w.slime(cxx, czz)) continue;
-            const [px, py] = toPx(cxx * 16, czz * 16);
-            ctx.fillRect(px, py, Math.max(1, sz), Math.max(1, sz));
-          }
-        }
-      }
-      // structures
-      const markers = [];
-      const names = new Map(WORLD.STRUCTURES.map((s) => [s.id, s.fr]));
-      names.set('stronghold', WORLD.STRONGHOLD.fr);
-      for (const s of mapStructList()) {
-        if (!sd.layers.structs[s.id]) continue;
-        if (s.id === 'stronghold') {
-          const key = ver.mc + '|' + ps.seed;
-          // les forteresses sont rangées en anneaux (3, 6, 10, 15, 21, 28, 36, 9) : on ne calcule que ceux qui peuvent être visibles
-          const far = Math.hypot(Math.max(Math.abs(X0), Math.abs(X1)), Math.max(Math.abs(Z0), Math.abs(Z1)));
-          const need = far < 3200 ? 3 : far < 6200 ? 9 : far < 9200 ? 19 : far < 15000 ? 35 : 128;
-          if (!mapState.sh || mapState.sh.key !== key || mapState.sh.n < need) mapState.sh = { key, n: need, list: w.strongholds(need) };
-          for (const [X, Z] of mapState.sh.list) if (X >= X0 && X <= X1 && Z >= Z0 && Z <= Z1) markers.push({ id: 'stronghold', x: X, z: Z });
-          continue;
-        }
-        if (!w.structureSupported(s.id)) { notes.push(`${s.fr} : n'existe pas dans cette version.`); continue; }
-        const reg = w.structureRegion(s.id) || 16;
-        if (Math.pow((X1 - X0) / reg, 2) > 5000) { notes.push(`${s.fr} : zoome pour les afficher (trop de positions à cette échelle).`); continue; }
-        for (const [X, Z] of w.structures(s.id, X0, Z0, X1, Z1)) markers.push({ id: s.id, x: X, z: Z });
-      }
-      if (dim === 0) {
-        const key = ver.mc + '|' + ps.seed;
-        if (!mapState.spawn || mapState.spawn.key !== key) mapState.spawn = { key, pos: w.spawn() };
-        const [X, Z] = mapState.spawn.pos;
-        if (X >= X0 && X <= X1 && Z >= Z0 && Z <= Z1) markers.push({ id: 'spawn', x: X, z: Z });
-      }
-      const imgs = {};
-      await Promise.all([...new Set(markers.map((m) => m.id))].map(async (id) => { imgs[id] = await loadIcon(iconUrl('structures', id)); }));
-      if (token !== mapState.token) return;
-      for (const m of markers) {
-        const [px, py] = toPx(m.x, m.z);
-        ctx.beginPath(); ctx.arc(px, py, 9, 0, Math.PI * 2);
-        ctx.fillStyle = markerColor(m.id); ctx.fill();
-        ctx.lineWidth = 2; ctx.strokeStyle = '#000'; ctx.stroke();
-        const img = imgs[m.id];
-        if (img) { ctx.imageSmoothingEnabled = false; ctx.drawImage(img, px - 7, py - 7, 14, 14); }
-        if (m.id === 'spawn') { ctx.beginPath(); ctx.arc(px, py, 11, 0, Math.PI * 2); ctx.lineWidth = 2; ctx.strokeStyle = '#fff'; ctx.stroke(); }
-      }
-      mapState.geom = { X0, Z0, S, cx, cz, size: MAP_CELLS * S };
-      mapState.markers = markers; mapState.names = names;
-      say('');
-      const nb = document.getElementById('map-notes');
-      if (nb) nb.innerHTML = notes.map(esc).join('<br>');
-      // légende des biomes
-      const total = ids.length;
-      const bl = document.getElementById('map-biomes');
-      if (bl) {
-        const rows = Object.keys(counts).map((id) => [Number(id), counts[id]]).sort((a, b) => b[1] - a[1]).slice(0, 12);
-        bl.innerHTML = rows.map(([id, n]) => {
-          const en = w.biomeName(id); const c = colors[id] || w.biomeColor(id);
-          return `<div class="biorow"><i class="sw" style="background:rgb(${c[0]},${c[1]},${c[2]})"></i>${biomeIconHtml(en)}<span>${esc(WORLD.BIOMES_FR[en] || en || 'Biome ' + id)}</span><b>${Math.round((n / total) * 100) || '<1'} %</b></div>`;
-        }).join('');
-      }
-      // liste des structures
-      const fl = document.getElementById('map-found');
-      if (fl) {
-        const list = markers.filter((m) => m.id !== 'spawn' || true).map((m) => ({ ...m, d: Math.round(Math.hypot(m.x - cx, m.z - cz)) })).sort((a, b) => a.d - b.d).slice(0, 40);
-        fl.innerHTML = list.length ? list.map((m) => `<button class="maprow" data-action="map-goto" data-x="${m.x}" data-z="${m.z}">${mkHtml(m.id)}<b>${esc(m.id === 'spawn' ? "Point d'apparition (approx.)" : names.get(m.id) || '?')}</b><span>X ${m.x} · Z ${m.z}</span><small>${m.d} blocs</small></button>`).join('')
-          : '<p class="hint">Aucune structure cochée dans cette zone. Active une couche ci-dessus ou dézoome.</p>';
-      }
-    } catch (e) {
-      say('Erreur de calcul : ' + (e && e.message ? e.message : e));
-    }
+    const p = genParams();
+    if (tileGen !== p.key) { tiles.clear(); tileGen = p.key; mapState.sh = null; mapState.spawn = null; }
+    ensureEngine(w, p);
+    // centre : coordonnées saisies, sinon le spawn (Overworld) ; 0 ; 0 dans les autres dimensions
+    if (p.dim === 0 && (!mapState.spawn || mapState.spawn.key !== p.key)) mapState.spawn = { key: p.key, pos: w.spawn() };
+    mapState.base = mode === 'coords' ? seedXZ() : p.dim === 0 ? mapState.spawn.pos : [0, 0];
+    mapState.names = new Map(WORLD.STRUCTURES.map((s) => [s.id, s.fr]));
+    mapState.names.set('stronghold', WORLD.STRONGHOLD.fr);
+    mapState.plan = layerPlan(w, p);
+    syncView();
+    for (const id of Object.keys(ICONS.structures)) loadIcon(iconUrl('structures', id)).then((img) => { if (img && !iconImgs[id]) { iconImgs[id] = img; schedulePaint(); } });
+    mapReady = true;
+    paint();
+    pump();
   }
 
   function pickAt(px, py, cssWidth) {
@@ -1123,9 +1244,9 @@
     let best = null, bd = radius;
     for (const m of mapState.markers) { const d = Math.hypot(m.x - X, m.z - Z); if (d <= bd) { bd = d; best = m; } }
     w.then((eng) => {
-      const sd = state.seed, ps = SEED.parseSeed(sd.text);
-      const ver = WORLD.VERSIONS.find((v) => v.key === sd.platform) || WORLD.VERSIONS[0];
-      eng.init(ver.mc, ps.seed, DIM_ID[sd.dimension], false);
+      const sd = state.seed, p = genParams();
+      if (!p) return;
+      ensureEngine(eng, p);
       const en = eng.biomeName(eng.biomeAt(X, Z, DIM_ID[sd.dimension] === 0 ? 256 : 60));
       const info = document.getElementById('map-info');
       if (!info) return;
@@ -1299,11 +1420,11 @@
       const sd = state.seed;
       if (el.dataset.reset) sd.pan = [0, 0];
       else sd.pan = [sd.pan[0] + Number(el.dataset.dx) * Math.round(viewBlocks() / 3), sd.pan[1] + Number(el.dataset.dz) * Math.round(viewBlocks() / 3)];
-      drawMap(); return;
+      syncView(); schedulePaint(); pump(); scheduleSettle(); return;
     }
     else if (a === 'map-goto') {
       const X = Number(el.dataset.x), Z = Number(el.dataset.z), [x0, z0] = mapState.base || [0, 0];
-      if (Number.isInteger(X) && Number.isInteger(Z)) { state.seed.pan = [X - x0, Z - z0]; drawMap(); }
+      if (Number.isInteger(X) && Number.isInteger(Z)) { state.seed.pan = [X - x0, Z - z0]; syncView(); schedulePaint(); pump(); scheduleSettle(); }
       return;
     }
     else if (a === 'map-copy') {
@@ -1435,7 +1556,6 @@
   // Carte : toucher = lire un point, glisser avec un doigt = se déplacer.
   // Seul le premier doigt compte : un deuxième doigt posé (pouce qui tient le téléphone) est ignoré.
   let drag = null;
-  const resetCv = () => { const cv = document.getElementById('seed-cv'); if (cv) cv.style.transform = ''; };
   APP.addEventListener('pointerdown', (e) => {
     if (!e.target || e.target.id !== 'seed-cv') return;
     if (drag && Date.now() - drag.t < 5000) return;          // un doigt est déjà en train de bouger la carte
@@ -1445,26 +1565,23 @@
   APP.addEventListener('pointermove', (e) => {
     if (!drag || e.pointerId !== drag.id) return;
     const cv = document.getElementById('seed-cv');
-    if (!cv) return;
+    const g = mapState.geom;
+    if (!cv || !g) return;
     const dx = e.clientX - drag.x, dy = e.clientY - drag.y;
-    if (Math.abs(dx) + Math.abs(dy) > 8) drag.moved = true;
-    if (drag.moved) cv.style.transform = `translate(${dx}px,${dy}px)`;
+    if (!drag.moved && Math.abs(dx) + Math.abs(dy) > 8) { drag.moved = true; drag.pan0 = state.seed.pan.slice(); drag.bpp = g.size / cv.getBoundingClientRect().width; }
+    if (drag.moved) {                                   // la carte suit le doigt en direct ; la génération continue en arrière-plan
+      state.seed.pan = [drag.pan0[0] - dx * drag.bpp, drag.pan0[1] - dy * drag.bpp];
+      syncView(); schedulePaint(); pump(); scheduleSettle();
+    }
   });
-  APP.addEventListener('pointercancel', (e) => { if (drag && e.pointerId === drag.id) { drag = null; resetCv(); } });
+  APP.addEventListener('pointercancel', (e) => { if (drag && e.pointerId === drag.id) { drag = null; scheduleSettle(); } });
   APP.addEventListener('pointerup', (e) => {
     if (!drag || e.pointerId !== drag.id) return;
     const d = drag; drag = null;
     const cv = document.getElementById('seed-cv');
     if (!cv) return;
-    cv.style.transform = '';
-    const r = cv.getBoundingClientRect();
-    if (d.moved) {
-      const g = mapState.geom, sd = state.seed;
-      if (!g) return;
-      const bpp = g.size / r.width;
-      sd.pan = [sd.pan[0] - Math.round((e.clientX - d.x) * bpp), sd.pan[1] - Math.round((e.clientY - d.y) * bpp)];
-      drawMap();
-    } else pickAt(e.clientX - r.left, e.clientY - r.top, r.width);
+    if (d.moved) { state.seed.pan = state.seed.pan.map(Math.round); syncView(); schedulePaint(); pump(); scheduleSettle(); }
+    else { const r = cv.getBoundingClientRect(); pickAt(e.clientX - r.left, e.clientY - r.top, r.width); }
   });
   let wheelAt = 0;
   APP.addEventListener('wheel', (e) => {
