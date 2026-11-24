@@ -928,7 +928,7 @@
   // ---------- Carte du monde (biomes + structures) ----------
   const DIM_ID = { overworld: 0, nether: -1, end: 1 };
   const ZOOMS = [[1, 'Bloc', '≈ 160 blocs'], [4, 'Détail', '≈ 640 blocs'], [16, 'Moyen', '≈ 2 500 blocs'], [64, 'Large', '≈ 10 000 blocs'], [256, 'Très large', '≈ 41 000 blocs']];
-  const MAP_CELLS = 160, MAP_PX = 2, MAP_SIZE = MAP_CELLS * MAP_PX;
+  const MAP_SIZE = 640, MU = 2;                      // image 640 × 640 (nette sur écran HD) ; MU = taille des repères
   const STRUCT_COLORS = { 5: '#ffd34d', 10: '#ff5555', 9: '#b07a3c', 8: '#55ffff', 13: '#4a8fe0', 24: '#ffaa00', 1: '#e6d28a', 2: '#3fbf3f', 3: '#b46be0', 4: '#ffffff', 6: '#6ab0de', 7: '#c58b4a', 14: '#ffdd55', 15: '#c0c0c0', 11: '#a020f0', 16: '#5599ff', 23: '#d9a066', 18: '#d63a2a', 19: '#f5c542', 12: '#a020f0', 20: '#ff55ff', stronghold: '#00e5a0' };
   const ICONS = window.MC_MAP_ICONS || { structures: {}, biomes: {} };
   const iconUrl = (kind, key) => { const f = (ICONS[kind] || {})[key]; return f ? 'assets/map-icons/' + f + '.png' : ''; };
@@ -957,7 +957,7 @@
     return l;
   };
   const LEVELS = [1, 4, 16, 64, 256, 1024, 4096, 16384, 65536, 262144, 1048576];   // blocs par cellule ; au-delà de 256 : échantillonnage espacé
-  const KMIN_FAR = 0.0000045, KMIN_NEAR = 0.004, KMAX = 4;                         // px de carte par bloc                       // pixels de carte par bloc : de ≈ 130 000 blocs à 1/4 de bloc par pixel
+  const KMIN_FAR = 0.000009, KMIN_NEAR = 0.008, KMAX = 8;                         // px de carte par bloc                       // pixels de carte par bloc : de ≈ 130 000 blocs à 1/4 de bloc par pixel
   const viewBlocks = () => MAP_SIZE / view.k;
 
   function mapSection() {
@@ -1102,7 +1102,7 @@
   // Prochaine tuile à générer : la plus proche du centre parmi celles de la zone visible + marge
   function nextWork(plan) {
     const S = state.seed.zoom, tb = TILE * S, half = MAP_SIZE / view.k / 2;
-    const PRE = Math.max(2, Math.ceil(160 / (tb * view.k)));          // marge d'environ une demi-carte au-delà de chaque bord
+    const PRE = Math.max(2, Math.ceil(200 / (tb * view.k)));          // marge d'environ une demi-carte au-delà de chaque bord
     const tx0 = Math.floor((view.cx - half) / tb) - PRE, tx1 = Math.floor((view.cx + half) / tb) + PRE;
     const tz0 = Math.floor((view.cz - half) / tb) - PRE, tz1 = Math.floor((view.cz + half) / tb) + PRE;
     let best = null, bd = Infinity;
@@ -1116,7 +1116,7 @@
     return best;
   }
   function strongholdNeed() {
-    const half = MAP_SIZE / view.k / 2 + 160 / view.k;
+    const half = MAP_SIZE / view.k / 2 + 200 / view.k;
     const far = Math.hypot(Math.abs(view.cx) + half, Math.abs(view.cz) + half);
     return far < 3200 ? 3 : far < 6200 ? 9 : far < 9200 ? 19 : far < 15000 ? 35 : 128;
   }
@@ -1197,21 +1197,28 @@
     const missing = drawLevel(S, true);
     if (plan.stronghold && mapState.sh && mapState.sh.key === p.key) for (const m of mapState.sh.list) markers.push({ id: 'stronghold', x: m[0], z: m[1] });
     if (p.dim === 0 && mapState.spawn && mapState.spawn.key === p.key) markers.push({ id: 'spawn', x: mapState.spawn.pos[0], z: mapState.spawn.pos[1] });
-    if (viewB > 100000) {                                  // limite du monde jouable (±29 999 984 blocs)
-      const B = 29999984, bx0 = (-B - X0) * k, bz0 = (-B - Z0) * k, bw = 2 * B * k;
-      ctx.lineWidth = 2; ctx.strokeStyle = 'rgba(255,85,85,.9)'; ctx.strokeRect(bx0, bz0, bw, bw);
+    {                                                      // limite du monde : gros trait blanc visible à tous les zooms (la carte continue au-delà)
+      const B = p.dim === -1 ? 3749998 : 29999984;         // valeurs par défaut du jeu (Nether : ÷ 8)
+      const L = (-B - X0) * k, R = (B - X0) * k, T = (-B - Z0) * k, Bo = (B - Z0) * k;
+      const x0 = Math.max(0, L), x1 = Math.min(MAP_SIZE, R), y0 = Math.max(0, T), y1 = Math.min(MAP_SIZE, Bo);
+      const seg = (ax, ay, bx, by) => { ctx.moveTo(ax, ay); ctx.lineTo(bx, by); };
+      ctx.beginPath();
+      if (y1 > y0) for (const x of [L, R]) if (x > -10 && x < MAP_SIZE + 10) seg(x, y0, x, y1);
+      if (x1 > x0) for (const y of [T, Bo]) if (y > -10 && y < MAP_SIZE + 10) seg(x0, y, x1, y);
+      ctx.lineCap = 'butt'; ctx.strokeStyle = '#000'; ctx.lineWidth = 5 * MU; ctx.stroke();
+      ctx.strokeStyle = '#ffffff'; ctx.lineWidth = 3 * MU; ctx.stroke();
     }
     const vis = [];
     for (const m of markers) {
       const px = (m.x - X0) * k, py = (m.z - Z0) * k;
-      if (px < -12 || py < -12 || px > MAP_SIZE + 12 || py > MAP_SIZE + 12) continue;
+      if (px < -12 * MU || py < -12 * MU || px > MAP_SIZE + 12 * MU || py > MAP_SIZE + 12 * MU) continue;
       vis.push(m);
-      ctx.beginPath(); ctx.arc(px, py, 9, 0, Math.PI * 2);
+      ctx.beginPath(); ctx.arc(px, py, 9 * MU, 0, Math.PI * 2);
       ctx.fillStyle = markerColor(m.id); ctx.fill();
-      ctx.lineWidth = 2; ctx.strokeStyle = '#000'; ctx.stroke();
+      ctx.lineWidth = 2 * MU; ctx.strokeStyle = '#000'; ctx.stroke();
       const img = iconImgs[m.id];
-      if (img) ctx.drawImage(img, px - 7, py - 7, 14, 14);
-      if (m.id === 'spawn') { ctx.beginPath(); ctx.arc(px, py, 11, 0, Math.PI * 2); ctx.lineWidth = 2; ctx.strokeStyle = '#fff'; ctx.stroke(); }
+      if (img) ctx.drawImage(img, px - 7 * MU, py - 7 * MU, 14 * MU, 14 * MU);
+      if (m.id === 'spawn') { ctx.beginPath(); ctx.arc(px, py, 11 * MU, 0, Math.PI * 2); ctx.lineWidth = 2 * MU; ctx.strokeStyle = '#fff'; ctx.stroke(); }
     }
     mapState.markers = vis;
     mapState.geom = { X0, Z0, S, cx: view.cx, cz: view.cz, size: viewB };
@@ -1294,7 +1301,7 @@
     mapState.names.set('stronghold', WORLD.STRONGHOLD.fr);
     mapState.plan = layerPlan(w, p);
     syncView();
-    if (!view.k) view.k = 2 / sd.zoom;
+    if (!view.k) view.k = 4 / sd.zoom;
     setK(view.k);
     for (const id of Object.keys(ICONS.structures)) loadIcon(iconUrl('structures', id)).then((img) => { if (img && !iconImgs[id]) { iconImgs[id] = img; schedulePaint(); } });
     mapReady = true;
@@ -1469,7 +1476,7 @@
     else if (a === 'seed-copy-seed') { const ps = SEED.parseSeed(state.seed.text); if (ps.seed !== null) copyText(ps.seed.toString(), 'Graine copiée.'); return; }
     else if (a === 'map-zoom') {
       if (el.dataset.z === 'max') tweenK(kmin(), 700);
-      else { const z = Number(el.dataset.z); if (ZOOMS.some((q) => q[0] === z)) tweenK(2 / z, 220); }
+      else { const z = Number(el.dataset.z); if (ZOOMS.some((q) => q[0] === z)) tweenK(4 / z, 220); }
       return;
     }
     else if (a === 'seed-random') {
