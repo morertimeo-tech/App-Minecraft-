@@ -14,4 +14,10 @@ sw = re.sub(r"const FILES = \[.*?\n\];", lambda m: listing, sw, count=1, flags=r
 if len(sys.argv) > 1:
     sw = re.sub(r"const CACHE = '[^']*';", "const CACHE = '%s';" % sys.argv[1], sw, count=1)
 open(os.path.join(root, 'sw.js'), 'w', encoding='utf-8').write(sw)
+# affiche le numéro de version dans l'en-tête (pour vérifier que la mise à jour est bien arrivée)
+m = re.search(r"const CACHE = 'grimoire-(v\d+)'", sw)
+if m:
+    ip = os.path.join(root, 'index.html'); h = open(ip, encoding='utf-8').read()
+    h = re.sub(r'(Guide de poche · Java)[^<]*', lambda x: x.group(1) + ' · ' + m.group(1), h, count=1)
+    open(ip, 'w', encoding='utf-8').write(h)
 print(len(files), 'fichiers')

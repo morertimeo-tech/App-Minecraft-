@@ -956,7 +956,8 @@
     if (d === 0) l.push(WORLD.STRONGHOLD);
     return l;
   };
-  const viewBlocks = () => state.seed.zoom * MAP_CELLS;
+  const KMIN = 0.004, KMAX = 4;                       // pixels de carte par bloc : de ≈ 130 000 blocs à 1/4 de bloc par pixel
+  const viewBlocks = () => MAP_SIZE / view.k;
 
   function mapSection() {
     const sd = state.seed;
@@ -974,7 +975,7 @@
         <button class="btn ghost small" data-action="map-pan" data-dx="1" data-dz="0" aria-label="Droite">▶</button>
         <button class="btn ghost small" data-action="map-pan" data-reset="1">Recentrer</button>
       </div>
-      <div id="map-info" class="mapinfo hint">Touche la carte pour lire le biome et les coordonnées, fais-la glisser avec un doigt pour te déplacer (zoom : boutons + et −). La carte est centrée sur le point d'apparition (boussole) si tu ne saisis pas de coordonnées.</div>
+      <div id="map-info" class="mapinfo hint">Touche la carte pour lire le biome et les coordonnées, un doigt pour te déplacer, deux doigts pour zoomer et déplacer en même temps (ou boutons + et −). La carte est centrée sur le point d'apparition (boussole) si tu ne saisis pas de coordonnées.</div>
       <div class="control-title">Couches</div>
       <div class="chips" role="group" aria-label="Couches">
         <button class="chip chipbtn ${L.biomes ? 'on' : ''}" data-action="map-layer" data-id="biomes" aria-pressed="${L.biomes}">Biomes</button>
@@ -993,14 +994,47 @@
   // La carte est découpée en tuiles de 32 × 32 cellules, générées en arrière-plan bien au-delà de l'écran
   // (PREFETCH tuiles de marge), de la plus proche du centre vers la plus lointaine. Pendant qu'on fait glisser
   // la carte, l'image se déplace en direct et la génération continue dans la direction du mouvement.
-  const TILE = 32, PREFETCH = 3, MAX_TILES = 900;
+  const TILE = 32, MAX_TILES = 900;
   const tiles = new Map();                       // 'échelle|tx|tz' -> tuile (biomes, structures, slimes)
   let tileGen = '';                              // identifiant du monde pour lequel le cache est valable
   let engineKey = '';
   let pumpTimer = null, paintReq = 0, settleTimer = null, mapReady = false;
-  const view = { cx: 0, cz: 0 };                 // centre de la vue (blocs, peut être décimal)
+  const view = { cx: 0, cz: 0, k: 0 };            // centre de la vue (blocs, décimal possible) et zoom continu (px par bloc)
+  const levelCount = {};                         // nombre de tuiles en cache par échelle
   const biomeCols = {};
   const iconImgs = {};
+
+  function levelFor(k) {
+    let best = ZOOMS[0][0], bd = Infinity;
+    for (const [S] of ZOOMS) { const d = Math.abs(Math.log((k * S) / 2 / 1.4)); if (d < bd) { bd = d; best = S; } }
+    return best;
+  }
+  function syncZoomUI() {
+    const S = state.seed.zoom;
+    document.querySelectorAll('[data-action="map-zoom"]').forEach((b) => { const on = Number(b.dataset.z) === S; b.classList.toggle('on', on); b.setAttribute('aria-pressed', on); });
+    const zin = document.querySelector('[data-action="map-zstep"][data-d="-1"]'), zout = document.querySelector('[data-action="map-zstep"][data-d="1"]');
+    if (zin) zin.disabled = view.k >= KMAX - 1e-9;
+    if (zout) zout.disabled = view.k <= KMIN + 1e-9;
+  }
+  function setK(k) {
+    view.k = Math.min(KMAX, Math.max(KMIN, k));
+    const S = levelFor(view.k);
+    if (S !== state.seed.zoom) { state.seed.zoom = S; state.seed.picked = null; }
+    syncZoomUI();
+  }
+  const syncPan = () => { const b = mapState.base || [0, 0]; state.seed.pan = [view.cx - b[0], view.cz - b[1]]; };
+  let tween = 0;
+  function tweenK(target, ms) {                      // zoom animé autour du centre de la carte
+    cancelAnimationFrame(tween);
+    const k0 = view.k, t0 = performance.now(), dur = ms || 200;
+    const step = (now) => {
+      const f = Math.min(1, (now - t0) / dur), e = 1 - Math.pow(1 - f, 3);
+      setK(k0 * Math.pow(Math.min(KMAX, Math.max(KMIN, target)) / k0, e));
+      schedulePaint(); pump(); scheduleSettle();
+      if (f < 1) tween = requestAnimationFrame(step);
+    };
+    tween = requestAnimationFrame(step);
+  }
 
   function genParams() {
     const sd = state.seed, ps = SEED.parseSeed(sd.text);
@@ -1017,7 +1051,7 @@
   const biomeCol = (w, id) => biomeCols[id] || (biomeCols[id] = w.biomeColor(id));
 
   function layerPlan(w, p) {
-    const sd = state.seed, viewB = sd.zoom * MAP_CELLS, ids = [], notes = [];
+    const sd = state.seed, viewB = MAP_SIZE / view.k, ids = [], notes = [];
     for (const s of mapStructList()) {
       if (s.id === 'stronghold' || !sd.layers.structs[s.id]) continue;
       if (!w.structureSupported(s.id)) { notes.push(`${s.fr} : n'existe pas dans cette version.`); continue; }
@@ -1044,7 +1078,7 @@
       }
       cx.putImageData(img, 0, 0);
       t = { S, tx, tz, ids, canvas: cv, mk: {}, slime: undefined };
-      tiles.set(key, t);
+      tiles.set(key, t); levelCount[S] = (levelCount[S] || 0) + 1;
     }
     for (const id of plan.ids) if (!(id in t.mk)) t.mk[id] = w.structures(id, X0, Z0, X1, Z1);
     if (plan.slime && t.slime === undefined) {
@@ -1061,9 +1095,10 @@
 
   // Prochaine tuile à générer : la plus proche du centre parmi celles de la zone visible + marge
   function nextWork(plan) {
-    const S = state.seed.zoom, tb = TILE * S, half = (MAP_CELLS * S) / 2;
-    const tx0 = Math.floor((view.cx - half) / tb) - PREFETCH, tx1 = Math.floor((view.cx + half) / tb) + PREFETCH;
-    const tz0 = Math.floor((view.cz - half) / tb) - PREFETCH, tz1 = Math.floor((view.cz + half) / tb) + PREFETCH;
+    const S = state.seed.zoom, tb = TILE * S, half = MAP_SIZE / view.k / 2;
+    const PRE = Math.max(2, Math.ceil(160 / (tb * view.k)));          // marge d'environ une demi-carte au-delà de chaque bord
+    const tx0 = Math.floor((view.cx - half) / tb) - PRE, tx1 = Math.floor((view.cx + half) / tb) + PRE;
+    const tz0 = Math.floor((view.cz - half) / tb) - PRE, tz1 = Math.floor((view.cz + half) / tb) + PRE;
     let best = null, bd = Infinity;
     for (let tz = tz0; tz <= tz1; tz++) for (let tx = tx0; tx <= tx1; tx++) {
       const t = tiles.get(`${S}|${tx}|${tz}`);
@@ -1075,7 +1110,7 @@
     return best;
   }
   function strongholdNeed() {
-    const half = (MAP_CELLS * state.seed.zoom) / 2 + PREFETCH * TILE * state.seed.zoom;
+    const half = MAP_SIZE / view.k / 2 + 160 / view.k;
     const far = Math.hypot(Math.abs(view.cx) + half, Math.abs(view.cz) + half);
     return far < 3200 ? 3 : far < 6200 ? 9 : far < 9200 ? 19 : far < 15000 ? 35 : 128;
   }
@@ -1113,7 +1148,7 @@
     }
     if (tiles.size > MAX_TILES) {                       // on oublie les tuiles les plus lointaines
       const arr = [...tiles.entries()].map(([k, t]) => [k, Math.hypot((t.tx + 0.5) * TILE * t.S - view.cx, (t.tz + 0.5) * TILE * t.S - view.cz)]).sort((a, b) => b[1] - a[1]);
-      for (let i = 0; i < arr.length - Math.floor(MAX_TILES * 0.7); i++) tiles.delete(arr[i][0]);
+      for (let i = 0; i < arr.length - Math.floor(MAX_TILES * 0.7); i++) { const t = tiles.get(arr[i][0]); if (t) levelCount[t.S]--; tiles.delete(arr[i][0]); }
     }
     if (did) schedulePaint();
     if (more) pump(); else scheduleSettle();
@@ -1128,24 +1163,32 @@
     const sd = state.seed, S = sd.zoom, p = genParams();
     if (!p) return;
     const ctx = cv.getContext('2d');
-    const viewB = S * MAP_CELLS, X0 = view.cx - viewB / 2, Z0 = view.cz - viewB / 2;
-    const k = MAP_SIZE / viewB;                               // pixels par bloc
-    const tb = TILE * S, tw = TILE * MAP_PX;
+    const k = view.k, viewB = MAP_SIZE / k, X0 = view.cx - viewB / 2, Z0 = view.cz - viewB / 2;
     ctx.imageSmoothingEnabled = false;
     ctx.fillStyle = '#1d1830'; ctx.fillRect(0, 0, MAP_SIZE, MAP_SIZE);
     const plan = mapState.plan || { ids: [], slime: false };
-    let missing = false;
     const markers = [];
-    const tx0 = Math.floor(X0 / tb), tx1 = Math.floor((X0 + viewB) / tb), tz0 = Math.floor(Z0 / tb), tz1 = Math.floor((Z0 + viewB) / tb);
-    for (let tz = tz0; tz <= tz1; tz++) for (let tx = tx0; tx <= tx1; tx++) {
-      const t = tiles.get(`${S}|${tx}|${tz}`);
-      if (!t) { missing = true; continue; }
-      const dx = Math.floor((tx * tb - X0) * k), dz = Math.floor((tz * tb - Z0) * k);
-      const dw = Math.ceil((tx * tb - X0) * k + tw) - dx, dh = Math.ceil((tz * tb - Z0) * k + tw) - dz;
-      if (sd.layers.biomes) ctx.drawImage(t.canvas, dx, dz, dw, dh);
-      if (plan.slime && t.slime) ctx.drawImage(t.slime, dx, dz, dw, dh);
-      for (const id of plan.ids) { const l = t.mk[id]; if (l) for (const m of l) markers.push({ id, x: m[0], z: m[1] }); }
-    }
+    const levelsDrawn = ZOOMS.map((q) => q[0]).filter((L) => L !== S && levelCount[L] > 0 && Math.abs(Math.log(L / S) / Math.log(4)) <= 2)
+      .sort((a, b) => Math.abs(Math.log(b / S)) - Math.abs(Math.log(a / S)));      // d'abord les plus éloignés, en fond
+    const drawLevel = (L, collect) => {
+      const tb = TILE * L, tw = tb * k;
+      const tx0 = Math.floor(X0 / tb), tx1 = Math.floor((X0 + viewB) / tb), tz0 = Math.floor(Z0 / tb), tz1 = Math.floor((Z0 + viewB) / tb);
+      let miss = 0;
+      for (let tz = tz0; tz <= tz1; tz++) for (let tx = tx0; tx <= tx1; tx++) {
+        const t = tiles.get(`${L}|${tx}|${tz}`);
+        if (!t) { miss++; continue; }
+        const dx = Math.floor((tx * tb - X0) * k), dz = Math.floor((tz * tb - Z0) * k);
+        const dw = Math.ceil((tx * tb - X0) * k + tw) - dx, dh = Math.ceil((tz * tb - Z0) * k + tw) - dz;
+        if (sd.layers.biomes) ctx.drawImage(t.canvas, dx, dz, dw, dh);
+        if (collect) {
+          if (plan.slime && t.slime) ctx.drawImage(t.slime, dx, dz, dw, dh);
+          for (const id of plan.ids) { const l = t.mk[id]; if (l) for (const m of l) markers.push({ id, x: m[0], z: m[1] }); }
+        }
+      }
+      return miss;
+    };
+    for (const L of levelsDrawn) drawLevel(L, false);
+    const missing = drawLevel(S, true);
     if (plan.stronghold && mapState.sh && mapState.sh.key === p.key) for (const m of mapState.sh.list) markers.push({ id: 'stronghold', x: m[0], z: m[1] });
     if (p.dim === 0 && mapState.spawn && mapState.spawn.key === p.key) markers.push({ id: 'spawn', x: mapState.spawn.pos[0], z: mapState.spawn.pos[1] });
     const vis = [];
@@ -1162,8 +1205,9 @@
     }
     mapState.markers = vis;
     mapState.geom = { X0, Z0, S, cx: view.cx, cz: view.cz, size: viewB };
+    // message « calcul » seulement si des tuiles manquent ET qu'aucun autre niveau ne les remplace
     const st = document.getElementById('map-status');
-    if (st) { st.textContent = 'Calcul de la carte…'; st.style.display = missing ? 'block' : 'none'; }
+    if (st) { st.textContent = 'Calcul de la carte…'; st.style.display = missing && !levelsDrawn.length ? 'block' : 'none'; }
   }
 
   // Légende des biomes, liste des structures et notes : mises à jour quand la carte se calme
@@ -1221,7 +1265,7 @@
     catch (e) { say("Le moteur de carte n'a pas pu se charger : une connexion est nécessaire la première fois."); return; }
     if (token !== mapState.token || document.getElementById('seed-cv') !== cv) return;
     const p = genParams();
-    if (tileGen !== p.key) { tiles.clear(); tileGen = p.key; mapState.sh = null; mapState.spawn = null; }
+    if (tileGen !== p.key) { tiles.clear(); for (const k of Object.keys(levelCount)) levelCount[k] = 0; tileGen = p.key; mapState.sh = null; mapState.spawn = null; }
     ensureEngine(w, p);
     // centre : coordonnées saisies, sinon le spawn (Overworld) ; 0 ; 0 dans les autres dimensions
     if (p.dim === 0 && (!mapState.spawn || mapState.spawn.key !== p.key)) mapState.spawn = { key: p.key, pos: w.spawn() };
@@ -1230,6 +1274,8 @@
     mapState.names.set('stronghold', WORLD.STRONGHOLD.fr);
     mapState.plan = layerPlan(w, p);
     syncView();
+    if (!view.k) view.k = 2 / sd.zoom;
+    setK(view.k);
     for (const id of Object.keys(ICONS.structures)) loadIcon(iconUrl('structures', id)).then((img) => { if (img && !iconImgs[id]) { iconImgs[id] = img; schedulePaint(); } });
     mapReady = true;
     paint();
@@ -1258,12 +1304,9 @@
     }).catch(() => {});
   }
 
-  function zoomStep(d) {
-    const i = ZOOMS.findIndex((q) => q[0] === state.seed.zoom);
-    const j = Math.min(ZOOMS.length - 1, Math.max(0, i + (d < 0 ? -1 : 1)));
-    if (i < 0 || j === i) return;
-    state.seed.zoom = ZOOMS[j][0]; state.seed.picked = null;
-    refreshSeedMap();
+  function zoomStep(d) {                              // boutons + / − et molette : facteur 2 par pas, animé
+    if (!view.k) return;
+    tweenK(view.k * (d < 0 ? 2 : 0.5), 180);
   }
 
   function refreshSeedMap() {
@@ -1406,7 +1449,7 @@
     else if (a === 'seed-copy-seed') { const ps = SEED.parseSeed(state.seed.text); if (ps.seed !== null) copyText(ps.seed.toString(), 'Graine copiée.'); return; }
     else if (a === 'map-zoom') {
       const z = Number(el.dataset.z);
-      if (ZOOMS.some((q) => q[0] === z)) { state.seed.zoom = z; state.seed.picked = null; refreshSeedMap(); }
+      if (ZOOMS.some((q) => q[0] === z)) tweenK(2 / z, 220);
       return;
     }
     else if (a === 'map-zstep') { zoomStep(Number(el.dataset.d)); return; }
@@ -1553,43 +1596,63 @@
 
   document.querySelectorAll('.tab').forEach((b) => b.addEventListener('click', () => setTab(b.dataset.tab)));
   APP.addEventListener('error', (e) => { if (e.target && e.target.classList && e.target.classList.contains('thumb')) e.target.style.display = 'none'; }, true);
-  // Carte : toucher = lire un point, glisser avec un doigt = se déplacer.
-  // Seul le premier doigt compte : un deuxième doigt posé (pouce qui tient le téléphone) est ignoré.
-  let drag = null;
+  // Carte, à la manière de Google Maps : un doigt déplace, deux doigts zooment (et déplacent en même temps), toucher = lire un point.
+  // Le point de la carte sous les doigts reste sous les doigts : la vue est recalculée à chaque mouvement.
+  const ptrs = new Map();
+  let gest = null;
+  function gestureBase(cv) {
+    const r = cv.getBoundingClientRect(), pts = [...ptrs.values()];
+    const mx = pts.reduce((a, q) => a + q[0], 0) / pts.length, my = pts.reduce((a, q) => a + q[1], 0) / pts.length;
+    const c = MAP_SIZE / r.width;
+    gest.c = c; gest.rect = r;
+    gest.ax = view.cx + ((mx - r.left - r.width / 2) * c) / view.k;       // point du monde sous le milieu des doigts
+    gest.az = view.cz + ((my - r.top - r.height / 2) * c) / view.k;
+    gest.d0 = pts.length > 1 ? Math.hypot(pts[0][0] - pts[1][0], pts[0][1] - pts[1][1]) || 1 : 0;
+    gest.k0 = view.k;
+  }
   APP.addEventListener('pointerdown', (e) => {
     if (!e.target || e.target.id !== 'seed-cv') return;
-    if (drag && Date.now() - drag.t < 5000) return;          // un doigt est déjà en train de bouger la carte
-    drag = { x: e.clientX, y: e.clientY, moved: false, id: e.pointerId, t: Date.now() };
+    cancelAnimationFrame(tween);
+    ptrs.set(e.pointerId, [e.clientX, e.clientY]);
     try { e.target.setPointerCapture(e.pointerId); } catch (err) { /* sans importance */ }
+    if (!gest) gest = { start: [e.clientX, e.clientY], moved: false, multi: false };
+    if (ptrs.size >= 2) { gest.multi = true; gest.moved = true; }
+    gestureBase(e.target);
   });
   APP.addEventListener('pointermove', (e) => {
-    if (!drag || e.pointerId !== drag.id) return;
-    const cv = document.getElementById('seed-cv');
-    const g = mapState.geom;
-    if (!cv || !g) return;
-    const dx = e.clientX - drag.x, dy = e.clientY - drag.y;
-    if (!drag.moved && Math.abs(dx) + Math.abs(dy) > 8) { drag.moved = true; drag.pan0 = state.seed.pan.slice(); drag.bpp = g.size / cv.getBoundingClientRect().width; }
-    if (drag.moved) {                                   // la carte suit le doigt en direct ; la génération continue en arrière-plan
-      state.seed.pan = [drag.pan0[0] - dx * drag.bpp, drag.pan0[1] - dy * drag.bpp];
-      syncView(); schedulePaint(); pump(); scheduleSettle();
-    }
+    if (!gest || !ptrs.has(e.pointerId)) return;
+    ptrs.set(e.pointerId, [e.clientX, e.clientY]);
+    const pts = [...ptrs.values()];
+    if (!gest.moved) { if (Math.hypot(e.clientX - gest.start[0], e.clientY - gest.start[1]) < 5) return; gest.moved = true; }
+    const r = gest.rect, c = gest.c;
+    const mx = pts.reduce((a, q) => a + q[0], 0) / pts.length, my = pts.reduce((a, q) => a + q[1], 0) / pts.length;
+    if (pts.length > 1 && gest.d0) setK(gest.k0 * (Math.hypot(pts[0][0] - pts[1][0], pts[0][1] - pts[1][1]) / gest.d0));
+    view.cx = gest.ax - ((mx - r.left - r.width / 2) * c) / view.k;
+    view.cz = gest.az - ((my - r.top - r.height / 2) * c) / view.k;
+    syncPan(); schedulePaint(); pump(); scheduleSettle();
   });
-  APP.addEventListener('pointercancel', (e) => { if (drag && e.pointerId === drag.id) { drag = null; scheduleSettle(); } });
-  APP.addEventListener('pointerup', (e) => {
-    if (!drag || e.pointerId !== drag.id) return;
-    const d = drag; drag = null;
+  const endPtr = (e, cancelled) => {
+    if (!gest || !ptrs.has(e.pointerId)) return;
+    ptrs.delete(e.pointerId);
     const cv = document.getElementById('seed-cv');
+    if (ptrs.size > 0) { if (cv) gestureBase(cv); return; }          // il reste un doigt : on continue à partir de lui, sans saut
+    const gg = gest; gest = null;
     if (!cv) return;
-    if (d.moved) { state.seed.pan = state.seed.pan.map(Math.round); syncView(); schedulePaint(); pump(); scheduleSettle(); }
-    else { const r = cv.getBoundingClientRect(); pickAt(e.clientX - r.left, e.clientY - r.top, r.width); }
-  });
+    if (!gg.moved && !gg.multi && !cancelled) { const r = cv.getBoundingClientRect(); pickAt(e.clientX - r.left, e.clientY - r.top, r.width); }
+    else scheduleSettle();
+  };
+  APP.addEventListener('pointerup', (e) => endPtr(e, false));
+  APP.addEventListener('pointercancel', (e) => endPtr(e, true));
   let wheelAt = 0;
   APP.addEventListener('wheel', (e) => {
-    if (!e.target || e.target.id !== 'seed-cv') return;
+    if (!e.target || e.target.id !== 'seed-cv' || !view.k) return;
     e.preventDefault();
-    const now = Date.now();
-    if (now - wheelAt < 250) return;
-    wheelAt = now; zoomStep(e.deltaY < 0 ? -1 : 1);
+    const r = e.target.getBoundingClientRect(), c = MAP_SIZE / r.width;
+    const ux = (e.clientX - r.left - r.width / 2) * c, uz = (e.clientY - r.top - r.height / 2) * c;
+    const ax = view.cx + ux / view.k, az = view.cz + uz / view.k;      // le point sous le curseur reste sous le curseur
+    setK(view.k * Math.exp(-Math.max(-300, Math.min(300, e.deltaY)) * 0.0018));
+    view.cx = ax - ux / view.k; view.cz = az - uz / view.k;
+    syncPan(); schedulePaint(); pump(); scheduleSettle();
   }, { passive: false });
   const homeLink = document.getElementById('homeLink');
   if (homeLink) homeLink.addEventListener('click', (e) => { e.preventDefault(); setTab('home'); });
