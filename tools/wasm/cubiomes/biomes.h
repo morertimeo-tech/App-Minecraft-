@@ -1,11 +1,12 @@
 #ifndef BIOMES_H_
 #define BIOMES_H_
 
-/* Minecraft versions */
+/// Minecraft versions
+/// MC_1_X refers to the latest patch of the respective 1.X release.
+/// NOTE: Development effort focuses on just the newest patch for each major
+/// release. Minor releases and major versions <= 1.0 are experimental.
 enum MCVersion
-{   // MC_1_X refers to the latest patch of the respective 1.X release.
-    // NOTE: Development effort focuses on just the newest patch for each major
-    // release. Minor releases and major versions <= 1.0 are experimental.
+{
     MC_UNDEF,
     MC_B1_7,
     MC_B1_8,
@@ -34,9 +35,16 @@ enum MCVersion
     MC_1_20_6, MC_1_20 = MC_1_20_6,
     MC_1_21_1,
     MC_1_21_3,
-    MC_1_21_WD, // Winter Drop, version TBA
-    MC_1_21 = MC_1_21_WD,
-    MC_NEWEST = MC_1_21,
+    MC_1_21_WD, MC_1_21_4 = MC_1_21_WD,
+    MC_1_21_5,
+    MC_1_21_6,
+    MC_1_21_9,
+    MC_1_21_11,
+    MC_1_21 = MC_1_21_11,
+    MC_26_1,
+    MC_26_2,
+    MC_26_3,
+    MC_NEWEST = MC_26_3,
 };
 
 enum Dimension
@@ -173,6 +181,10 @@ enum BiomeID
     cherry_grove                    = 185,
     // 1.21 Winter Drop
     pale_garden                     = 186,
+    // 26.2 Chaos Cubed
+    sulfur_caves                    = 187,
+    // 26.3
+    dappled_forest                  = 188,
 };
 
 
@@ -185,10 +197,13 @@ extern "C"
 // BiomeID Helper Functions
 //==============================================================================
 
+/// Checks if the biome id exists in the given Minecraft version.
 int biomeExists(int mc, int id);
-int isOverworld(int mc, int id); // false for biomes that don't generate
+/// false for biomes that don't generate
+int isOverworld(int mc, int id);
 int getDimension(int id);
 int getMutated(int mc, int id);
+/// Gets the biome category as a base biome id, or none if not mapped.
 int getCategory(int mc, int id);
 int areSimilar(int mc, int id1, int id2);
 int isMesa(int id);

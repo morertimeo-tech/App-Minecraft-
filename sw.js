@@ -1,6 +1,6 @@
 // Service worker : met toute l'app en cache pour l'usage hors-ligne.
 // Changer CACHE à chaque mise à jour pour forcer le rafraîchissement.
-const CACHE = 'grimoire-v27';
+const CACHE = 'grimoire-v28';
 const FILES = [
   './', './index.html', './manifest.webmanifest',
   './assets/armorstand.png',
@@ -522,7 +522,9 @@ const FILES = [
   './assets/map-icons/blocks_birch_sapling.png',
   './assets/map-icons/blocks_blue_ice.png',
   './assets/map-icons/blocks_blue_orchid.png',
+  './assets/map-icons/blocks_bone_block_side.png',
   './assets/map-icons/blocks_calcite.png',
+  './assets/map-icons/blocks_campfire_log.png',
   './assets/map-icons/blocks_dandelion.png',
   './assets/map-icons/blocks_dark_oak_sapling.png',
   './assets/map-icons/blocks_emerald_ore.png',
@@ -564,6 +566,7 @@ const FILES = [
   './assets/map-icons/items_echo_shard.png',
   './assets/map-icons/items_ender_eye.png',
   './assets/map-icons/items_glow_berries.png',
+  './assets/map-icons/items_glowstone_dust.png',
   './assets/map-icons/items_heart_of_the_sea.png',
   './assets/map-icons/items_kelp.png',
   './assets/map-icons/items_oak_boat.png',

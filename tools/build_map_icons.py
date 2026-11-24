@@ -10,11 +10,11 @@ root = os.path.dirname(out_dir)
 # identifiant cubiomes de la structure -> texture (items/… ou blocks/…)
 STRUCTS = {
     '5': 'items/bell', '10': 'items/crossbow_standby', '9': 'items/totem_of_undying', '8': 'blocks/prismarine_bricks',
-    '13': 'items/echo_shard', '24': 'items/trial_key', '1': 'blocks/sandstone', '2': 'blocks/mossy_cobblestone',
+    '13': 'items/echo_shard', '25': 'items/trial_key', '1': 'blocks/sandstone', '2': 'blocks/mossy_cobblestone',
     '3': 'items/cauldron', '4': 'blocks/snow', '6': 'blocks/mossy_stone_bricks', '7': 'items/oak_boat',
     '14': 'items/heart_of_the_sea', '15': 'blocks/rail', '11': 'blocks/obsidian', '12': 'blocks/obsidian',
-    '16': 'items/water_bucket', '23': 'items/brush', '18': 'blocks/nether_bricks', '19': 'blocks/gilded_blackstone',
-    '20': 'blocks/purpur_block', 'stronghold': 'items/ender_eye', 'spawn': 'items/compass_00',
+    '16': 'items/water_bucket', '24': 'items/brush', '26': 'blocks/campfire_log', '20': 'blocks/bone_block_side', '18': 'blocks/nether_bricks', '19': 'blocks/gilded_blackstone',
+    '21': 'blocks/purpur_block', 'stronghold': 'items/ender_eye', 'spawn': 'items/compass_00',
 }
 # (mot contenu dans le nom du biome) -> texture ; le premier qui correspond gagne
 BIOME_RULES = [
@@ -34,7 +34,7 @@ BIOME_RULES = [
     ('wooded_badlands', 'blocks/terracotta'), ('badlands', 'blocks/red_sand'),
     ('gravelly', 'blocks/gravel'), ('windswept', 'blocks/emerald_ore'), ('mountain', 'blocks/emerald_ore'),
     ('hills', 'blocks/oak_sapling'), ('shrubland', 'blocks/oak_sapling'),
-    ('dripstone', 'items/pointed_dripstone'), ('lush', 'items/glow_berries'), ('deep_dark', 'blocks/sculk'),
+    ('sulfur', 'items/glowstone_dust'), ('dripstone', 'items/pointed_dripstone'), ('lush', 'items/glow_berries'), ('deep_dark', 'blocks/sculk'),
     ('nether_wastes', 'blocks/netherrack'), ('crimson', 'blocks/crimson_fungus'), ('warped', 'blocks/warped_fungus'),
     ('soul_sand', 'blocks/soul_sand'), ('basalt', 'blocks/basalt_side'),
     ('end_midlands', 'items/chorus_fruit'), ('end_highlands', 'items/chorus_fruit'), ('the_end', 'blocks/end_stone'),

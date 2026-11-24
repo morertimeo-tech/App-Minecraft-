@@ -59,7 +59,7 @@
     trade: { prof: null, q: '' }, // onglet Échanges : profession ouverte, recherche
     struct: { id: null, q: '' },  // onglet Structures : structure ouverte, recherche
     homeQ: '',                    // accueil : recherche globale
-    seed: { text: '', platform: 'java_1_21', dimension: 'overworld', x: '', z: '', embed: false, name: '', saved: [], pan: [0, 0], picked: null, msg: '', importOpen: false, exportText: '', zoom: 16, layers: { biomes: true, slime: false, structs: { 5: true, stronghold: true, 18: true, 19: true, 20: true } } }, // onglet Graine
+    seed: { text: '', platform: 'java_26_3', dimension: 'overworld', x: '', z: '', embed: false, name: '', saved: [], pan: [0, 0], picked: null, msg: '', importOpen: false, exportText: '', zoom: 16, layers: { biomes: true, slime: false, structs: { 5: true, stronghold: true, 18: true, 19: true, 20: true } } }, // onglet Graine
     farm: { id: null, q: '', adding: false, playing: null, draft: { title: '', url: '', note: '' }, err: '', msg: '', importOpen: false, exportText: '' }, // onglet Fermes
     trim: trimState,
   };
@@ -830,8 +830,9 @@
 
   // ---------- Graine ----------
   const SEEDS_KEY = 'grimoire.seeds.v1';
-  const cbPlatform = (p) => (SEED.PLATFORMS.includes(p) ? p : 'java_1_21');
-  const PLATFORM_LABEL = (id) => 'Java ' + id.replace('java_', '').replace(/_/g, '.');
+  // Chunkbase : seules 1.12 à 1.21 ont une valeur connue ; les patchs 1.21.x → java_1_21 ; ailleurs on n'envoie pas de version
+  const cbPlatform = (p) => (SEED.PLATFORMS.includes(p) ? p : /^java_1_21/.test(p) ? 'java_1_21' : undefined);
+  const PLATFORM_LABEL = (id) => { const v = WORLD.VERSIONS.find((q) => q.key === id); return 'Java ' + (v ? v.label : id); };
   const DIM_LABEL = { overworld: 'Overworld', nether: 'Nether', end: "L'End" };
   const TOOLS = [
     ['seed-map', 'Carte de la graine', 'biomes et structures'],
@@ -1365,14 +1366,14 @@
         <label class="field">Graine (nombre ou texte)
           <span class="seedrow"><input id="sd-text" type="text" inputmode="text" placeholder="Ex. 123456789" value="${esc(sd.text)}" autocomplete="off" autocapitalize="off" spellcheck="false" /><button type="button" class="btn small seeddice" data-action="seed-random" aria-label="Générer une graine aléatoire">🎲 Aléatoire</button></span></label>
         <label class="field">Version
-          <select id="sd-platform">${WORLD.VERSIONS.map((v) => `<option value="${v.key}" ${v.key === sd.platform ? 'selected' : ''}>Java ${esc(v.label)}</option>`).join('')}</select></label>
+          <select id="sd-platform">${[...new Set(WORLD.VERSIONS.map((v) => v.group))].map((g) => `<optgroup label="${esc(g)}">${WORLD.VERSIONS.filter((v) => v.group === g).map((v) => `<option value="${v.key}" ${v.key === sd.platform ? 'selected' : ''}>Java ${esc(v.label)}</option>`).join('')}</optgroup>`).join('')}</select></label>
         <label class="field">Dimension
           <select id="sd-dim">${SEED.DIMENSIONS.map((d) => `<option value="${d}" ${d === sd.dimension ? 'selected' : ''}>${esc(DIM_LABEL[d])}</option>`).join('')}</select></label>
         <div class="two">
           <label class="field">X<input id="sd-x" type="number" inputmode="numeric" step="1" placeholder="spawn" value="${esc(sd.x)}" /></label>
           <label class="field">Z<input id="sd-z" type="number" inputmode="numeric" step="1" placeholder="spawn" value="${esc(sd.z)}" /></label>
         </div>
-        <p class="hint" style="margin:10px 0 0">Les versions plus récentes que 1.21.4 (26.x) ne sont pas dans la liste : le générateur n'est pas garanti pour elles.</p>
+        <p class="hint" style="margin:10px 0 0">Versions de la bêta 1.7 à Java 26.3 (la plus récente gérée). Alpha et Infdev n'existent pas dans le générateur. Avant la 1.18, la génération par couches est plus ancienne : la précision est moins éprouvée.</p>
       </section>
       <h2 class="section">Carte du monde</h2>
       <section class="panel" id="seed-mapbox">${mapSection()}</section>

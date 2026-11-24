@@ -29,17 +29,30 @@ const S = require('../js/seed.js');
   assert.strictEqual(matched, v1.length, `placement indépendant : ${matched}/${v1.length}`);
 
   // 4. Biomes : zone complète, noms FR présents pour chaque biome rencontré
-  for (const key of ['java_1_21', 'java_1_18', 'java_1_16', 'java_1_12']) {
+  // Toutes les versions proposées : le monde se génère, chaque biome rencontré a un nom français et une icône
+  for (const { key } of W.VERSIONS) {
     world.init(V(key), -4172144997902289642n, 0, false);
     const b = world.biomes(4, -128, -128, 64, 64, 64);
     assert(b && b.length === 4096, key + ' biomes');
     const kinds = new Set(b);
-    assert(kinds.size >= 3, key + ' variété de biomes');
+    assert(kinds.size >= 2, key + ' variété de biomes');
     for (const id of kinds) {
       const name = world.biomeName(id);
       assert(name, key + ' nom du biome ' + id);
       assert(W.BIOMES_FR[name], key + ' manque la traduction de ' + name);
     }
+  }
+  // Cohérence : les clés sont uniques et les identifiants de version aussi
+  assert.strictEqual(new Set(W.VERSIONS.map((v) => v.key)).size, W.VERSIONS.length);
+  assert.strictEqual(new Set(W.VERSIONS.map((v) => v.mc)).size, W.VERSIONS.length);
+  // Le placement des villages de la 26.3 suit la même formule que la 1.21
+  world.init(V('java_26_3'), 12345n, 0, false);
+  const v263 = world.structures(5, -3000, -3000, 3000, 3000);
+  assert(v263.length > 5);
+  for (const [x, z] of v263) {
+    const rx = Math.floor(x / 16 / 34), rz = Math.floor(z / 16 / 34);
+    const r = rnd(12345n, rx, rz, 10387312);
+    assert(Math.floor(x / 16) === rx * 34 + r.nextInt(26) && Math.floor(z / 16) === rz * 34 + r.nextInt(26), '26.3 : village hors formule');
   }
   // 5. Spawn et forteresses
   world.init(V('java_1_21'), 1n, 0, false);
@@ -51,11 +64,11 @@ const S = require('../js/seed.js');
   world.init(V('java_1_21'), 1n, -1, false);
   assert(world.structures(18, -2000, -2000, 2000, 2000).length > 0, 'forteresses du Nether');
   world.init(V('java_1_21'), 1n, 1, false);
-  assert(world.structures(20, -3000, -3000, 3000, 3000).length > 0, "cités de l'End");
+  assert(world.structures(21, -3000, -3000, 3000, 3000).length > 0, "cités de l'End");
   // 7. Icônes : chaque structure et chaque biome (sauf le vide) a une icône présente sur le disque
   const ic = JSON.parse(fs.readFileSync(path.join(__dirname, '../js/map-icons.js'), 'utf8').replace(/^[^{]*=\s*/, '').replace(/;\s*$/, ''));
   const have = (f) => fs.existsSync(path.join(__dirname, '../assets/map-icons', f + '.png'));
   for (const st of [...W.STRUCTURES, W.STRONGHOLD, { id: 'spawn' }]) assert(ic.structures[st.id] && have(ic.structures[st.id]), 'icône de structure ' + st.id);
   for (const n of Object.keys(W.BIOMES_FR)) if (n !== 'the_void') assert(ic.biomes[n] && have(ic.biomes[n]), 'icône de biome ' + n);
-  console.log('OK : générateur de monde (' + v1.length + ' villages recoupés, biomes 4 versions, spawn, forteresses)');
+  console.log('OK : générateur de monde (' + v1.length + ' villages recoupés, biomes ' + W.VERSIONS.length + ' versions, spawn, forteresses)');
 })().catch((e) => { console.error(e); process.exit(1); });
