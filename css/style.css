@@ -426,3 +426,22 @@ button.poster small { position: absolute; left: 8px; bottom: 6px; z-index: 1; fo
 .embed { margin-top: 10px; height: 70vh; min-height: 420px; border: 2px solid #000; border-radius: 10px; overflow: hidden; background: #fff; }
 .embed iframe { width: 100%; height: 100%; border: 0; }
 a.chip { text-decoration: none; }
+
+/* ---- Carte du monde (onglet Graine) ---- */
+.mapwrap { position: relative; margin-top: 10px; overflow: hidden; border: 2px solid #000; border-radius: 8px; background: #1d1830; line-height: 0; }
+.mapcv { display: block; width: 100%; height: auto; image-rendering: pixelated; touch-action: none; cursor: grab; user-select: none; -webkit-user-select: none; }
+.mapstatus { position: absolute; inset: auto 8px 8px 8px; padding: 6px 10px; border-radius: 8px; background: rgba(20,16,31,.88); color: var(--text); font-size: 13px; line-height: 1.35; }
+.chip.on { background: #3a2f63; border-color: var(--gold); }
+.chip small { color: var(--muted); font-size: 11px; }
+.sw { display: inline-block; width: 12px; height: 12px; border-radius: 3px; border: 1px solid #000; margin-right: 6px; vertical-align: -1px; flex: none; }
+.mapinfo { margin: 8px 0 0; font-size: 13.5px; line-height: 1.45; }
+.mapinfo.hint { color: var(--muted); }
+.mapbiomes { display: grid; gap: 4px; }
+.biorow { display: flex; align-items: center; font-size: 13.5px; }
+.biorow span { flex: 1; }
+.biorow b { color: var(--muted); font-weight: 600; }
+.maprow { display: flex; align-items: center; gap: 4px; width: 100%; flex-wrap: wrap; text-align: left; font: inherit; font-size: 13.5px; color: var(--text); background: #1d1830; border: 1px solid #3a3157; border-radius: 10px; padding: 8px 10px; margin-bottom: 6px; cursor: pointer; }
+.maprow b { margin-right: auto; }
+.maprow span { color: var(--aqua); font-family: ui-monospace, Menlo, Consolas, monospace; font-size: 12.5px; }
+.maprow small { color: var(--muted); width: 100%; padding-left: 20px; }
+.maprow:hover { border-color: var(--gold); }

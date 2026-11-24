@@ -8,7 +8,7 @@ Application web mobile (HTML/CSS/JS, sans build) avec :
 
 3. **Minerais** : meilleur niveau Y et plage de génération de chaque minerai (Overworld et Nether).
 4. **Structures** : 23 structures (village, cité antique, bastion, cité de l'End…) avec biomes, commande `/locate` et butins possibles par coffre (929 lignes, chance de trouver chaque objet). La recherche répond aussi à « où trouver tel objet ».
-5. **Graine** : prépare ta graine (nombre ou texte converti comme dans le jeu), la version, la dimension et les coordonnées, puis ouvre la carte sur **Chunkbase** (site externe) déjà réglée, ou affiche-la dans l'app (essai). Les **chunks à slimes** (Java) et les conversions de coordonnées sont calculés dans l'app, hors-ligne. Graines enregistrables, avec copie et import.
+5. **Graine** : entre une graine (nombre ou texte, converti comme dans le jeu), une version Java (1.12 à 1.21.4+), une dimension et des coordonnées : l'app **génère la carte dans ton téléphone** — biomes (avec leur part dans la zone), villages et 20 autres types de structures, forteresses (strongholds), point d'apparition, chunks à slimes — avec zoom, déplacement au doigt et lecture du biome / des coordonnées en touchant. Fonctionne hors-ligne une fois l'app chargée. Graines enregistrables, convertisseur de coordonnées, lien Chunkbase pour comparer.
 6. **Fermes** : une liste de fermes à construire (33, classées par catégorie) avec, pour chacune, **tes builds** : des liens de vidéos YouTube que tu ajoutes toi-même, lisibles directement dans l'app (lecteur intégré, connexion requise).
 7. **Échanges** : tous les échanges des 13 professions de villageois et du colporteur (283 échanges, par niveau), avec recherche d'un objet dans toutes les professions.
 
@@ -37,6 +37,9 @@ js/farms-data.js      liste des fermes (généré par tools/build_farms.py)
 js/builds-data.js     tes liens de vidéos par ferme (à éditer)
 js/video.js           reconnaissance et sécurisation des liens vidéo
 js/seed.js            graine, chunks à slimes, coordonnées et lien Chunkbase
+js/world.js           chargeur du générateur de monde (biomes, structures) + noms français
+assets/world.wasm     générateur de monde (cubiomes compilé en WebAssembly)
+tools/wasm/           sources, shim libc et build.sh du générateur (clang + wasm-ld)
 tools/                scripts qui extraient les échanges du wiki et génèrent js/trades-data.js
 js/app.js             interface
 assets/               textures copiées du jeu (Minecraft 26.1, via PrismarineJS/minecraft-assets)
@@ -157,10 +160,10 @@ node tools/render_art.js <dossier assets 26.1> .
 
 Correspondance métier → bloc : page « Villager » du wiki. Les images du colporteur n'ont pas de bloc.
 
-## Graine et Chunkbase : ce qui est vérifié et ce qui ne l'est pas
+## Graine : générateur de monde, ce qui est vérifié et ce qui ne l'est pas
 
-- **Calculé dans l'app et testé** : conversion de graine comme dans le jeu (nombre 64 bits, sinon `String.hashCode`), chunks à slimes (algorithme du wiki, croisé avec une réimplémentation indépendante et des vecteurs publics de `java.util.Random`), conversions de coordonnées.
-- **Non recodé** : les biomes et la position des structures. Ils demandent de simuler tout le générateur de terrain, qui change selon les versions ; pour ça, l'app prépare un lien vers Chunkbase.
-- **Lien Chunkbase** : le format `…/apps/seed-map#seed=…&platform=java_1_21&dimension=overworld&x=…&z=…` vient d'un seul lien partagé trouvé en ligne, pas d'une documentation du site (Chunkbase n'était pas joignable depuis l'environnement de développement). Les valeurs de version et de dimension autres que celles de cet exemple (`java_1_20`…, `nether`, `end`) sont déduites. Si le site change ou refuse un réglage, la graine reste copiable.
-- **Affichage dans l'app** : essai avec un `iframe` ; non testé contre le vrai site, qui peut refuser d'être intégré.
-- Pas d'accès officiel à Chunkbase : Grimoire n'en est pas affilié.
+- **Moteur** : [cubiomes](https://github.com/Cubitect/cubiomes) (licence MIT, copie dans `tools/wasm/cubiomes/`), la bibliothèque de référence qui reproduit le générateur de Minecraft Java. Compilée en WebAssembly (`tools/wasm/build.sh`, nécessite clang et wasm-ld), ~480 Ko. Aucune donnée n'est envoyée en ligne.
+- **Vérifié ici** : les 30 villages d'une zone test correspondent à un calcul indépendant du placement (formule du wiki : espacement 34, séparation 8, sel 10387312) ; la carte se génère pour 1.12, 1.16, 1.18 et 1.21, en Overworld, Nether et End ; chunks à slimes recoupés avec une réimplémentation JS. Voir `tests/world.test.js`.
+- **Non vérifié** : je n'ai pas pu comparer les biomes ni les structures à une vraie partie ni à Chunkbase (site non joignable depuis l'environnement de développement). La fiabilité repose sur cubiomes, largement utilisée par la communauté, pas sur ma propre vérification visuelle dans le jeu.
+- **Limites connues** : (1) une structure est placée à partir de la graine puis validée par le biome ; le terrain exact (par exemple un village sur l'eau) n'est pas simulé, donc un point peut être faux ; (2) le point d'apparition est une estimation ; (3) les biomes affichés sont ceux de la surface (altitude 256) : pas les grottes ; (4) mineshafts, trésors enfouis et puits du désert ne s'affichent qu'au zoom Détail ou Moyen (trop nombreux sinon) ; (5) les versions plus récentes que 1.21.4 (26.x) ne sont pas gérées ; (6) pas de mode « grands biomes » ni de Bedrock.
+- **Lien Chunkbase** : le format `…/apps/seed-map#seed=…&platform=java_1_21&dimension=overworld&x=…&z=…` vient d'un seul lien partagé trouvé en ligne, pas d'une documentation du site. Grimoire n'est pas affilié à Chunkbase.

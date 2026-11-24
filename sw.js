@@ -1,6 +1,6 @@
 // Service worker : met toute l'app en cache pour l'usage hors-ligne.
 // Changer CACHE à chaque mise à jour pour forcer le rafraîchissement.
-const CACHE = 'grimoire-v17';
+const CACHE = 'grimoire-v18';
 const FILES = [
   './', './index.html', './manifest.webmanifest',
   './assets/armorstand.png',
@@ -604,6 +604,7 @@ const FILES = [
   './assets/villagers/toolsmith.png',
   './assets/villagers/wandering_trader.png',
   './assets/villagers/weaponsmith.png',
+  './assets/world.wasm',
   './assets/worn/layer1/chainmail.png',
   './assets/worn/layer1/copper.png',
   './assets/worn/layer1/diamond.png',
@@ -632,6 +633,7 @@ const FILES = [
   './js/trades-data.js',
   './js/trims.js',
   './js/video.js',
+  './js/world.js',
   './vendor/three.min.js',
 ];
 self.addEventListener('install', (e) => {

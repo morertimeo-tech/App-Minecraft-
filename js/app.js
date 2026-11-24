@@ -6,6 +6,7 @@
   const TRADES = window.MC_TRADES;
   const FARMS = window.MC_FARMS;
   const SEED = window.MC_SEED;
+  const WORLD = window.MC_WORLD;
   const VIDEO = window.MC_VIDEO;
   const FILE_BUILDS = window.MC_BUILDS || {};
   const STRUCTS = window.MC_STRUCTURES;
@@ -58,7 +59,7 @@
     trade: { prof: null, q: '' }, // onglet Échanges : profession ouverte, recherche
     struct: { id: null, q: '' },  // onglet Structures : structure ouverte, recherche
     homeQ: '',                    // accueil : recherche globale
-    seed: { text: '', platform: 'java_1_21', dimension: 'overworld', x: '0', z: '0', embed: false, name: '', saved: [], pan: [0, 0], picked: null, msg: '', importOpen: false, exportText: '' }, // onglet Graine
+    seed: { text: '', platform: 'java_1_21', dimension: 'overworld', x: '0', z: '0', embed: false, name: '', saved: [], pan: [0, 0], picked: null, msg: '', importOpen: false, exportText: '', zoom: 16, layers: { biomes: true, slime: false, structs: { 5: true, stronghold: true, 18: true, 19: true, 20: true } } }, // onglet Graine
     farm: { id: null, q: '', adding: false, playing: null, draft: { title: '', url: '', note: '' }, err: '', msg: '', importOpen: false, exportText: '' }, // onglet Fermes
     trim: trimState,
   };
@@ -550,7 +551,7 @@
       { tab: 'structures', icon: 'item-icons/ender_eye', title: 'Structures', desc: 'Où les trouver et ce qu’elles contiennent', stat: `${STRUCTS.length} structures · ${nLoot} butins` },
       { tab: 'trades', icon: 'item-icons/emerald', title: 'Échanges', desc: 'Tous les échanges des villageois, niveau par niveau', stat: `${nTrades} échanges` },
       { tab: 'ores', icon: 'items/diamond', title: 'Minerais', desc: 'Le meilleur niveau Y de chaque minerai', stat: `${DATA.ORES.length} minerais` },
-      { tab: 'seed', icon: 'item-icons/slimeball', title: 'Graine', desc: 'Ouvre ta graine sur Chunkbase, chunks à slimes et coordonnées', stat: 'Version · dimension · X Z' },
+      { tab: 'seed', icon: 'item-icons/slimeball', title: 'Graine', desc: 'Carte de ta graine : biomes, villages, structures, spawn, slimes', stat: 'Version · dimension · X Z' },
       { tab: 'farms', icon: 'item-icons/wheat', title: 'Fermes', desc: 'Les fermes à construire, avec tes vidéos YouTube en direct', stat: `${FARMS.length} fermes · ${FARMS.reduce((a, f) => a + countBuilds(f.id), 0)} builds` },
     ];
     return `<div class="home-tiles">${T.map((t) => `
@@ -829,6 +830,7 @@
 
   // ---------- Graine ----------
   const SEEDS_KEY = 'grimoire.seeds.v1';
+  const cbPlatform = (p) => (SEED.PLATFORMS.includes(p) ? p : 'java_1_21');
   const PLATFORM_LABEL = (id) => 'Java ' + id.replace('java_', '').replace(/_/g, '.');
   const DIM_LABEL = { overworld: 'Overworld', nether: 'Nether', end: "L'End" };
   const TOOLS = [
@@ -847,7 +849,7 @@
       id: typeof b.id === 'string' && b.id ? b.id.slice(0, 40) : newId(),
       name: (typeof b.name === 'string' && b.name.trim() ? b.name.trim() : 'Ma graine').slice(0, 60),
       text,
-      platform: SEED.PLATFORMS.includes(b.platform) ? b.platform : 'java_1_21',
+      platform: WORLD.VERSIONS.some((v) => v.key === b.platform) ? b.platform : 'java_1_21',
       dimension: SEED.DIMENSIONS.includes(b.dimension) ? b.dimension : 'overworld',
       x: Number.isInteger(x) && Math.abs(x) <= SEED.COORD_LIMIT ? x : 0,
       z: Number.isInteger(z) && Math.abs(z) <= SEED.COORD_LIMIT ? z : 0,
@@ -872,7 +874,7 @@
   function seedUrl(tool) {
     const ps = SEED.parseSeed(state.seed.text);
     const [x, z] = seedXZ();
-    return SEED.chunkbaseUrl({ tool, seed: ps.seed, platform: state.seed.platform, dimension: state.seed.dimension, x, z });
+    return SEED.chunkbaseUrl({ tool, seed: ps.seed, platform: cbPlatform(state.seed.platform), dimension: state.seed.dimension, x, z });
   }
 
   function seedOutputs() {
@@ -882,7 +884,7 @@
     const url = seedUrl('seed-map');
     const has = ps.kind !== 'empty';
     let resolved;
-    if (ps.kind === 'empty') resolved = '<p class="hint" style="margin:0 0 10px">Entre une graine (un nombre, ou un texte comme dans le jeu) pour générer le lien.</p>';
+    if (ps.kind === 'empty') resolved = '<p class="hint" style="margin:0 0 10px">Entre une graine (un nombre, ou un texte comme dans le jeu) pour générer la carte.</p>';
     else if (ps.kind === 'number') resolved = `<p class="seedline">Graine : <b>${esc(ps.seed.toString())}</b></p>`;
     else resolved = `<p class="seedline">Texte « ${esc(ps.text)} » → graine <b>${esc(ps.seed.toString())}</b> <small>(conversion du jeu)</small></p>`;
 
@@ -890,7 +892,6 @@
     const det = coordsOk ? SEED.describeCoords(sd.dimension, x, z) : null;
     const fmt = (a) => `${a[0]} ; ${a[1]}`;
     const conv = det ? `
-      <div class="control-title">Coordonnées</div>
       <div class="kv">
         ${det.overworld ? `<span>Overworld</span><b>X ${det.overworld[0]} · Z ${det.overworld[1]}</b>` : ''}
         ${det.nether ? `<span>Nether</span><b>X ${det.nether[0]} · Z ${det.nether[1]}</b>` : ''}
@@ -901,80 +902,229 @@
       </div>
       ${det.nether && sd.dimension === 'overworld' ? '<p class="hint" style="margin:6px 0 0">Nether = Overworld ÷ 8 (arrondi vers le bas), sur X et Z seulement.</p>' : ''}` : '<p class="hint">Entre des coordonnées entières valides (X et Z) pour les convertir.</p>';
 
-    const slime = !has ? '<p class="hint">Entre une graine pour calculer les chunks à slimes.</p>'
-      : sd.dimension !== 'overworld' ? '<p class="hint">Les chunks à slimes n\'existent que dans l\'Overworld : choisis cette dimension.</p>'
-      : !coordsOk ? '<p class="hint">Entre des coordonnées valides pour centrer la carte.</p>' : `
-        <canvas id="slime-cv" class="slimecv" width="341" height="341" aria-label="Carte des chunks à slimes"></canvas>
-        <div class="toolbar" style="margin-top:8px">
-          <button class="btn ghost small" data-action="slime-pan" data-dx="-8" data-dz="0" aria-label="Gauche">◀</button>
-          <button class="btn ghost small" data-action="slime-pan" data-dx="0" data-dz="-8" aria-label="Haut">▲</button>
-          <button class="btn ghost small" data-action="slime-pan" data-dx="0" data-dz="8" aria-label="Bas">▼</button>
-          <button class="btn ghost small" data-action="slime-pan" data-dx="8" data-dz="0" aria-label="Droite">▶</button>
-          <button class="btn ghost small" data-action="slime-pan" data-dx="0" data-dz="0" data-reset="1">Recentrer</button>
-        </div>
-        <div id="slime-info" class="hint" style="margin-top:6px">${slimeInfoText()}</div>`;
-
     return `
       ${resolved}
-      <div class="toolbar" style="margin-top:0">
-        <a class="btn" href="${esc(url)}" target="_blank" rel="noopener noreferrer">Ouvrir sur Chunkbase ↗</a>
-        <button class="btn ghost small" data-action="seed-embed">${sd.embed ? 'Masquer ici' : 'Afficher ici (essai)'}</button>
-      </div>
-      <div class="toolbar" style="margin-top:6px">
-        <button class="btn ghost small" data-action="seed-copy-link">Copier le lien</button>
-        <button class="btn ghost small" data-action="seed-copy-seed" ${has ? '' : 'disabled'}>Copier la graine</button>
-      </div>
       ${sd.msg ? `<div class="notice warn" style="margin-top:8px">${esc(sd.msg)}</div>` : ''}
-      <div class="cmd" style="margin-top:8px"><code>${esc(url)}</code></div>
-      ${sd.embed ? `<div class="embed"><iframe src="${esc(url)}" title="Chunkbase" loading="lazy" referrerpolicy="no-referrer"
-          sandbox="allow-scripts allow-same-origin allow-popups allow-forms allow-popups-to-escape-sandbox"></iframe></div>
-        <p class="hint">Si l'écran reste vide ou affiche une erreur, c'est que Chunkbase refuse d'être affiché dans une autre application : utilise « Ouvrir sur Chunkbase ».</p>` : ''}
-      <h2 class="section">Chunks à slimes (calculés ici)</h2>
-      ${slime}
-      <h2 class="section">Convertisseur</h2>
-      <section class="panel">${conv}</section>`;
+      <h2 class="section">Convertisseur de coordonnées</h2>
+      <section class="panel">${conv}</section>
+      <h2 class="section">Comparer avec Chunkbase</h2>
+      <section class="panel">
+        <div class="toolbar" style="margin-top:0">
+          <a class="btn ghost small" href="${esc(url)}" target="_blank" rel="noopener noreferrer">Ouvrir sur Chunkbase ↗</a>
+          <button class="btn ghost small" data-action="seed-copy-link">Copier le lien</button>
+          <button class="btn ghost small" data-action="seed-copy-seed" ${has ? '' : 'disabled'}>Copier la graine</button>
+        </div>
+      </section>`;
   }
 
-  function slimeInfoText() {
-    const p = state.seed.picked;
-    if (!p) return "Touche un chunk pour voir ses coordonnées. Vert = chunk à slimes, cadre doré = chunk de ta position.";
-    return `Chunk <b>${p.cx} ; ${p.cz}</b> — blocs X ${p.cx * 16} à ${p.cx * 16 + 15}, Z ${p.cz * 16} à ${p.cz * 16 + 15} : ${p.slime ? '<b style="color:var(--green)">chunk à slimes</b>' : 'pas de slimes'}.`;
-  }
-
-  // Dessine la carte : 31 × 31 chunks autour du chunk de la position (décalée par les flèches)
-  const SLIME_N = 31, SLIME_CELL = 11;
-  function slimeOrigin() {
-    const [x, z] = seedXZ();
-    return [SEED.blockToChunk(x) + state.seed.pan[0], SEED.blockToChunk(z) + state.seed.pan[1]];
-  }
-  function drawSlime() {
-    const cv = document.getElementById('slime-cv');
-    if (!cv) return;
-    const ps = SEED.parseSeed(state.seed.text);
-    if (ps.kind === 'empty') return;
-    const [ocx, ocz] = slimeOrigin();
-    const [x, z] = seedXZ();
-    const homeC = [SEED.blockToChunk(x), SEED.blockToChunk(z)];
-    const half = (SLIME_N - 1) / 2;
-    const ctx = cv.getContext('2d');
-    ctx.clearRect(0, 0, cv.width, cv.height);
-    for (let i = 0; i < SLIME_N; i++) for (let j = 0; j < SLIME_N; j++) {
-      const cx = ocx - half + i, cz = ocz - half + j;
-      const slime = SEED.isSlimeChunk(ps.seed, cx, cz);
-      ctx.fillStyle = slime ? '#55ff55' : '#1d1830';
-      ctx.fillRect(i * SLIME_CELL, j * SLIME_CELL, SLIME_CELL, SLIME_CELL);
-      ctx.strokeStyle = 'rgba(255,255,255,.08)';
-      ctx.strokeRect(i * SLIME_CELL + .5, j * SLIME_CELL + .5, SLIME_CELL - 1, SLIME_CELL - 1);
-      if (cx === 0 || cz === 0) { ctx.fillStyle = 'rgba(85,170,255,.28)'; ctx.fillRect(i * SLIME_CELL, j * SLIME_CELL, SLIME_CELL, SLIME_CELL); }   // axes X=0 / Z=0
+  // ---------- Carte du monde (biomes + structures) ----------
+  const DIM_ID = { overworld: 0, nether: -1, end: 1 };
+  const ZOOMS = [[4, 'Détail', '≈ 640 blocs'], [16, 'Moyen', '≈ 2 500 blocs'], [64, 'Large', '≈ 10 000 blocs'], [256, 'Très large', '≈ 41 000 blocs']];
+  const MAP_CELLS = 160, MAP_PX = 2, MAP_SIZE = MAP_CELLS * MAP_PX;
+  const STRUCT_COLORS = { 5: '#ffd34d', 10: '#ff5555', 9: '#b07a3c', 8: '#55ffff', 13: '#4a8fe0', 24: '#ffaa00', 1: '#e6d28a', 2: '#3fbf3f', 3: '#b46be0', 4: '#ffffff', 6: '#6ab0de', 7: '#c58b4a', 14: '#ffdd55', 15: '#c0c0c0', 11: '#a020f0', 16: '#5599ff', 23: '#d9a066', 18: '#d63a2a', 19: '#f5c542', 12: '#a020f0', 20: '#ff55ff', stronghold: '#00e5a0' };
+  const mapState = { token: 0, geom: null, markers: [], note: '' };
+  let worldP = null;
+  function worldEngine() {
+    if (!worldP) {
+      worldP = fetch('assets/world.wasm').then((r) => { if (!r.ok) throw new Error('moteur introuvable'); return r.arrayBuffer(); }).then((b) => WORLD.load(b));
+      worldP.catch(() => { worldP = null; });
     }
-    const mark = (cx, cz, color, w) => {
-      const i = cx - (ocx - half), j = cz - (ocz - half);
-      if (i < 0 || j < 0 || i >= SLIME_N || j >= SLIME_N) return;
-      ctx.strokeStyle = color; ctx.lineWidth = w; ctx.strokeRect(i * SLIME_CELL + w / 2, j * SLIME_CELL + w / 2, SLIME_CELL - w, SLIME_CELL - w); ctx.lineWidth = 1;
-    };
-    mark(homeC[0], homeC[1], '#ffb83d', 2);
-    if (state.seed.picked) mark(state.seed.picked.cx, state.seed.picked.cz, '#ffffff', 2);
+    return worldP;
   }
+  const mapStructList = () => {
+    const d = DIM_ID[state.seed.dimension];
+    const l = WORLD.STRUCTURES.filter((s) => s.dim === d);
+    if (d === 0) l.push(WORLD.STRONGHOLD);
+    return l;
+  };
+  const viewBlocks = () => state.seed.zoom * MAP_CELLS;
+
+  function mapSection() {
+    const sd = state.seed;
+    const ps = SEED.parseSeed(sd.text);
+    const [x, z] = seedXZ();
+    if (ps.kind === 'empty') return '<p class="hint">Entre une graine pour afficher la carte.</p>';
+    if (x === null || z === null) return '<p class="hint">Entre des coordonnées valides (X et Z) pour centrer la carte.</p>';
+    const L = sd.layers;
+    return `
+      <div class="chips" role="group" aria-label="Zoom">${ZOOMS.map(([s, name, w]) => `<button class="chip chipbtn ${sd.zoom === s ? 'on' : ''}" data-action="map-zoom" data-z="${s}" aria-pressed="${sd.zoom === s}">${name} <small>${w}</small></button>`).join('')}</div>
+      <div class="mapwrap"><canvas id="seed-cv" class="mapcv" width="${MAP_SIZE}" height="${MAP_SIZE}" aria-label="Carte du monde"></canvas><div id="map-status" class="mapstatus">Chargement du moteur de carte…</div></div>
+      <div class="toolbar" style="margin-top:8px">
+        <button class="btn ghost small" data-action="map-pan" data-dx="-1" data-dz="0" aria-label="Gauche">◀</button>
+        <button class="btn ghost small" data-action="map-pan" data-dx="0" data-dz="-1" aria-label="Haut">▲</button>
+        <button class="btn ghost small" data-action="map-pan" data-dx="0" data-dz="1" aria-label="Bas">▼</button>
+        <button class="btn ghost small" data-action="map-pan" data-dx="1" data-dz="0" aria-label="Droite">▶</button>
+        <button class="btn ghost small" data-action="map-pan" data-reset="1">Recentrer</button>
+      </div>
+      <div id="map-info" class="mapinfo hint">Touche la carte pour lire le biome et les coordonnées, fais-la glisser pour te déplacer. Croix dorée = tes coordonnées.</div>
+      <div class="control-title">Couches</div>
+      <div class="chips" role="group" aria-label="Couches">
+        <button class="chip chipbtn ${L.biomes ? 'on' : ''}" data-action="map-layer" data-id="biomes" aria-pressed="${L.biomes}">Biomes</button>
+        ${DIM_ID[sd.dimension] === 0 ? `<button class="chip chipbtn ${L.slime ? 'on' : ''}" data-action="map-layer" data-id="slime" aria-pressed="${L.slime}">Chunks à slimes</button>` : ''}
+      </div>
+      <div class="control-title">Structures</div>
+      <div class="chips" role="group" aria-label="Structures">${mapStructList().map((s) => `<button class="chip chipbtn ${L.structs[s.id] ? 'on' : ''}" data-sid="${s.id}" data-action="map-layer" data-id="${s.id}" aria-pressed="${!!L.structs[s.id]}"><i class="sw" style="background:${STRUCT_COLORS[s.id] || '#fff'}"></i>${esc(s.fr)}</button>`).join('')}</div>
+      <div id="map-notes" class="hint" style="margin-top:6px"></div>
+      <div class="control-title">Biomes dans la zone</div>
+      <div id="map-biomes" class="mapbiomes"></div>
+      <div class="control-title">Structures dans la zone</div>
+      <div id="map-found"></div>`;
+  }
+
+  async function drawMap() {
+    const cv = document.getElementById('seed-cv');
+    if (!cv) return;
+    const sd = state.seed, ps = SEED.parseSeed(sd.text), [x0, z0] = seedXZ();
+    if (ps.kind === 'empty' || x0 === null || z0 === null) return;
+    const token = ++mapState.token;
+    const status = document.getElementById('map-status');
+    const say = (m) => { if (status) { status.textContent = m; status.style.display = m ? 'block' : 'none'; } };
+    say('Calcul de la carte…');
+    let w;
+    try { w = await worldEngine(); }
+    catch (e) { say("Le moteur de carte n'a pas pu se charger : une connexion est nécessaire la première fois."); return; }
+    if (token !== mapState.token) return;
+    await new Promise((r) => setTimeout(r, 20));             // laisse le message s'afficher avant le calcul
+    if (token !== mapState.token || document.getElementById('seed-cv') !== cv) return;
+    try {
+      const ver = WORLD.VERSIONS.find((v) => v.key === sd.platform) || WORLD.VERSIONS[0];
+      const dim = DIM_ID[sd.dimension];
+      w.init(ver.mc, ps.seed, dim, false);
+      const S = sd.zoom, cx = x0 + sd.pan[0], cz = z0 + sd.pan[1];
+      const bx0 = Math.floor(cx / S) - MAP_CELLS / 2, bz0 = Math.floor(cz / S) - MAP_CELLS / 2;
+      const X0 = bx0 * S, Z0 = bz0 * S, X1 = X0 + MAP_CELLS * S - 1, Z1 = Z0 + MAP_CELLS * S - 1;
+      const ids = w.biomes(S, bx0, bz0, MAP_CELLS, MAP_CELLS, dim === 0 ? 64 : 15);   // y = 256 en Overworld : biomes de surface, pas les grottes
+      if (!ids) throw new Error('biomes indisponibles');
+      const ctx = cv.getContext('2d');
+      ctx.imageSmoothingEnabled = false;
+      ctx.fillStyle = '#1d1830'; ctx.fillRect(0, 0, MAP_SIZE, MAP_SIZE);
+      const colors = {}, counts = {};
+      if (sd.layers.biomes) {
+        const off = document.createElement('canvas'); off.width = off.height = MAP_CELLS;
+        const octx = off.getContext('2d'); const img = octx.createImageData(MAP_CELLS, MAP_CELLS);
+        for (let i = 0; i < ids.length; i++) {
+          const id = ids[i];
+          const c = colors[id] || (colors[id] = w.biomeColor(id));
+          img.data[i * 4] = c[0]; img.data[i * 4 + 1] = c[1]; img.data[i * 4 + 2] = c[2]; img.data[i * 4 + 3] = 255;
+        }
+        octx.putImageData(img, 0, 0);
+        ctx.drawImage(off, 0, 0, MAP_SIZE, MAP_SIZE);
+      }
+      for (let i = 0; i < ids.length; i++) counts[ids[i]] = (counts[ids[i]] || 0) + 1;
+      const toPx = (X, Z) => [((X - X0) / (MAP_CELLS * S)) * MAP_SIZE, ((Z - Z0) / (MAP_CELLS * S)) * MAP_SIZE];
+      const notes = [];
+      // chunks à slimes
+      if (sd.layers.slime && dim === 0) {
+        if (S > 16) notes.push('Chunks à slimes : zoome (Détail ou Moyen) pour les voir.');
+        else {
+          ctx.fillStyle = 'rgba(100,255,90,.6)';
+          const c0x = Math.floor(X0 / 16), c1x = Math.floor(X1 / 16), c0z = Math.floor(Z0 / 16), c1z = Math.floor(Z1 / 16);
+          const sz = (16 / (MAP_CELLS * S)) * MAP_SIZE;
+          for (let czz = c0z; czz <= c1z; czz++) for (let cxx = c0x; cxx <= c1x; cxx++) {
+            if (!w.slime(cxx, czz)) continue;
+            const [px, py] = toPx(cxx * 16, czz * 16);
+            ctx.fillRect(px, py, Math.max(1, sz), Math.max(1, sz));
+          }
+        }
+      }
+      // axes X = 0 / Z = 0
+      ctx.strokeStyle = 'rgba(255,255,255,.35)'; ctx.lineWidth = 1;
+      if (X0 <= 0 && X1 >= 0) { const [px] = toPx(0, 0); ctx.beginPath(); ctx.moveTo(px + .5, 0); ctx.lineTo(px + .5, MAP_SIZE); ctx.stroke(); }
+      if (Z0 <= 0 && Z1 >= 0) { const [, py] = toPx(0, 0); ctx.beginPath(); ctx.moveTo(0, py + .5); ctx.lineTo(MAP_SIZE, py + .5); ctx.stroke(); }
+      // structures
+      const markers = [];
+      const names = new Map(WORLD.STRUCTURES.map((s) => [s.id, s.fr]));
+      names.set('stronghold', WORLD.STRONGHOLD.fr);
+      for (const s of mapStructList()) {
+        if (!sd.layers.structs[s.id]) continue;
+        if (s.id === 'stronghold') {
+          const key = ver.mc + '|' + ps.seed;
+          // les forteresses sont rangées en anneaux (3, 6, 10, 15, 21, 28, 36, 9) : on ne calcule que ceux qui peuvent être visibles
+          const far = Math.hypot(Math.max(Math.abs(X0), Math.abs(X1)), Math.max(Math.abs(Z0), Math.abs(Z1)));
+          const need = far < 3200 ? 3 : far < 6200 ? 9 : far < 9200 ? 19 : far < 15000 ? 35 : 128;
+          if (!mapState.sh || mapState.sh.key !== key || mapState.sh.n < need) mapState.sh = { key, n: need, list: w.strongholds(need) };
+          for (const [X, Z] of mapState.sh.list) if (X >= X0 && X <= X1 && Z >= Z0 && Z <= Z1) markers.push({ id: 'stronghold', x: X, z: Z });
+          continue;
+        }
+        if (!w.structureSupported(s.id)) { notes.push(`${s.fr} : n'existe pas dans cette version.`); continue; }
+        const reg = w.structureRegion(s.id) || 16;
+        if (Math.pow((X1 - X0) / reg, 2) > 5000) { notes.push(`${s.fr} : zoome pour les afficher (trop de positions à cette échelle).`); continue; }
+        for (const [X, Z] of w.structures(s.id, X0, Z0, X1, Z1)) markers.push({ id: s.id, x: X, z: Z });
+      }
+      if (dim === 0) {
+        const key = ver.mc + '|' + ps.seed;
+        if (!mapState.spawn || mapState.spawn.key !== key) mapState.spawn = { key, pos: w.spawn() };
+        const [X, Z] = mapState.spawn.pos;
+        if (X >= X0 && X <= X1 && Z >= Z0 && Z <= Z1) markers.push({ id: 'spawn', x: X, z: Z });
+      }
+      for (const m of markers) {
+        const [px, py] = toPx(m.x, m.z);
+        ctx.beginPath(); ctx.arc(px, py, m.id === 'spawn' ? 6 : 5, 0, Math.PI * 2);
+        ctx.fillStyle = m.id === 'spawn' ? '#ffffff' : (STRUCT_COLORS[m.id] || '#fff'); ctx.fill();
+        ctx.lineWidth = 2; ctx.strokeStyle = '#000'; ctx.stroke();
+        if (m.id === 'spawn') { ctx.beginPath(); ctx.arc(px, py, 2, 0, Math.PI * 2); ctx.fillStyle = '#d33'; ctx.fill(); }
+      }
+      // ta position (croix dorée) au centre de la vue initiale
+      const [hx, hy] = toPx(x0, z0);
+      if (hx >= 0 && hx <= MAP_SIZE && hy >= 0 && hy <= MAP_SIZE) {
+        ctx.strokeStyle = '#000'; ctx.lineWidth = 4; ctx.beginPath(); ctx.moveTo(hx - 7, hy); ctx.lineTo(hx + 7, hy); ctx.moveTo(hx, hy - 7); ctx.lineTo(hx, hy + 7); ctx.stroke();
+        ctx.strokeStyle = '#ffb83d'; ctx.lineWidth = 2; ctx.stroke();
+      }
+      mapState.geom = { X0, Z0, S, cx, cz, size: MAP_CELLS * S };
+      mapState.markers = markers; mapState.names = names;
+      say('');
+      const nb = document.getElementById('map-notes');
+      if (nb) nb.innerHTML = notes.map(esc).join('<br>');
+      // légende des biomes
+      const total = ids.length;
+      const bl = document.getElementById('map-biomes');
+      if (bl) {
+        const rows = Object.keys(counts).map((id) => [Number(id), counts[id]]).sort((a, b) => b[1] - a[1]).slice(0, 12);
+        bl.innerHTML = rows.map(([id, n]) => {
+          const en = w.biomeName(id); const c = colors[id] || w.biomeColor(id);
+          return `<div class="biorow"><i class="sw" style="background:rgb(${c[0]},${c[1]},${c[2]})"></i><span>${esc(WORLD.BIOMES_FR[en] || en || 'Biome ' + id)}</span><b>${Math.round((n / total) * 100) || '<1'} %</b></div>`;
+        }).join('');
+      }
+      // liste des structures
+      const fl = document.getElementById('map-found');
+      if (fl) {
+        const list = markers.filter((m) => m.id !== 'spawn' || true).map((m) => ({ ...m, d: Math.round(Math.hypot(m.x - cx, m.z - cz)) })).sort((a, b) => a.d - b.d).slice(0, 40);
+        fl.innerHTML = list.length ? list.map((m) => `<button class="maprow" data-action="map-goto" data-x="${m.x}" data-z="${m.z}"><i class="sw" style="background:${m.id === 'spawn' ? '#fff' : STRUCT_COLORS[m.id] || '#fff'}"></i><b>${esc(m.id === 'spawn' ? "Point d'apparition (approx.)" : names.get(m.id) || '?')}</b><span>X ${m.x} · Z ${m.z}</span><small>${m.d} blocs</small></button>`).join('')
+          : '<p class="hint">Aucune structure cochée dans cette zone. Active une couche ci-dessus ou dézoome.</p>';
+      }
+    } catch (e) {
+      say('Erreur de calcul : ' + (e && e.message ? e.message : e));
+    }
+  }
+
+  function pickAt(px, py, cssWidth) {
+    const g = mapState.geom, w = worldP;
+    if (!g || !w) return;
+    const X = Math.floor(g.X0 + (px / cssWidth) * g.size), Z = Math.floor(g.Z0 + (py / cssWidth) * g.size);
+    const radius = (14 / cssWidth) * g.size;
+    let best = null, bd = radius;
+    for (const m of mapState.markers) { const d = Math.hypot(m.x - X, m.z - Z); if (d <= bd) { bd = d; best = m; } }
+    w.then((eng) => {
+      const sd = state.seed, ps = SEED.parseSeed(sd.text);
+      const ver = WORLD.VERSIONS.find((v) => v.key === sd.platform) || WORLD.VERSIONS[0];
+      eng.init(ver.mc, ps.seed, DIM_ID[sd.dimension], false);
+      const en = eng.biomeName(eng.biomeAt(X, Z, DIM_ID[sd.dimension] === 0 ? 256 : 60));
+      const info = document.getElementById('map-info');
+      if (!info) return;
+      const at = best ? best : { x: X, z: Z };
+      info.classList.remove('hint');
+      info.innerHTML = `${best ? `<b>${esc(best.id === 'spawn' ? "Point d'apparition (approx.)" : mapState.names.get(best.id) || '?')}</b> — X ${best.x} · Z ${best.z}<br>` : ''}Biome : <b>${esc(WORLD.BIOMES_FR[en] || en || 'inconnu')}</b> · X ${X} · Z ${Z} · chunk ${SEED.blockToChunk(X)} ; ${SEED.blockToChunk(Z)}
+        <div class="toolbar" style="margin-top:6px"><button class="btn ghost small" data-action="map-goto" data-x="${at.x}" data-z="${at.z}">Centrer ici</button>
+        <button class="btn ghost small" data-action="map-copy" data-x="${at.x}" data-z="${at.z}">Copier X Z</button></div>`;
+    }).catch(() => {});
+  }
+
+  function refreshSeedMap() {
+    const box = document.getElementById('seed-mapbox');
+    if (box) { box.innerHTML = mapSection(); drawMap(); }
+  }
+  let mapTimer = null;
+  function scheduleMap() { clearTimeout(mapTimer); mapTimer = setTimeout(drawMap, 300); }
 
   function seedSavedList() {
     const list = state.seed.saved;
@@ -984,7 +1134,7 @@
         <div class="tname" style="font-family:ui-monospace,Menlo,monospace;font-size:12.5px;overflow-wrap:anywhere">${esc(e.text || '(sans graine)')} · X ${e.x} · Z ${e.z}</div>
         <div class="toolbar" style="margin-top:8px">
           <button class="btn small" data-action="seed-load" data-id="${esc(e.id)}">Charger</button>
-          <a class="btn ghost small" href="${esc(SEED.chunkbaseUrl({ tool: 'seed-map', seed: SEED.parseSeed(e.text).seed, platform: e.platform, dimension: e.dimension, x: e.x, z: e.z }))}" target="_blank" rel="noopener noreferrer">Chunkbase ↗</a>
+          <a class="btn ghost small" href="${esc(SEED.chunkbaseUrl({ tool: 'seed-map', seed: SEED.parseSeed(e.text).seed, platform: cbPlatform(e.platform), dimension: e.dimension, x: e.x, z: e.z }))}" target="_blank" rel="noopener noreferrer">Chunkbase ↗</a>
           <button class="btn ghost small danger" data-action="seed-del" data-id="${esc(e.id)}">Supprimer</button>
         </div>
       </div>`).join('') : '<p class="hint">Aucune graine enregistrée.</p>';
@@ -993,20 +1143,22 @@
   function renderSeed() {
     const sd = state.seed;
     return `
-      <p class="hint" style="margin:6px 2px 10px">Prépare ta graine, puis ouvre la carte sur <b>Chunkbase</b> (site externe) déjà réglée sur ta version, ta dimension et tes coordonnées. Les <b>chunks à slimes</b> et les conversions de coordonnées sont calculés directement dans l'app, hors-ligne. Les biomes et les structures, eux, demandent Chunkbase.</p>
+      <p class="hint" style="margin:6px 2px 10px">Entre ta graine, ta version et ta dimension : l'app génère la carte <b>dans ton téléphone</b> (biomes, villages et autres structures, forteresses, point d'apparition, chunks à slimes), sans connexion une fois chargée.</p>
       <section class="panel">
         <label class="field">Graine (nombre ou texte)
           <input id="sd-text" type="text" inputmode="text" placeholder="Ex. 123456789 ou mon monde" value="${esc(sd.text)}" autocomplete="off" autocapitalize="off" spellcheck="false" /></label>
         <label class="field">Version
-          <select id="sd-platform">${SEED.PLATFORMS.map((p) => `<option value="${p}" ${p === sd.platform ? 'selected' : ''}>${esc(PLATFORM_LABEL(p))}</option>`).join('')}</select></label>
+          <select id="sd-platform">${WORLD.VERSIONS.map((v) => `<option value="${v.key}" ${v.key === sd.platform ? 'selected' : ''}>Java ${esc(v.label)}</option>`).join('')}</select></label>
         <label class="field">Dimension
           <select id="sd-dim">${SEED.DIMENSIONS.map((d) => `<option value="${d}" ${d === sd.dimension ? 'selected' : ''}>${esc(DIM_LABEL[d])}</option>`).join('')}</select></label>
         <div class="two">
           <label class="field">X<input id="sd-x" type="number" inputmode="numeric" step="1" value="${esc(sd.x)}" /></label>
           <label class="field">Z<input id="sd-z" type="number" inputmode="numeric" step="1" value="${esc(sd.z)}" /></label>
         </div>
-        <p class="hint" style="margin:10px 0 0">Version : les versions plus récentes que 1.21 (26.x) ne sont pas dans la liste ; choisis 1.21 puis règle la version exacte sur le site si besoin.</p>
+        <p class="hint" style="margin:10px 0 0">Les versions plus récentes que 1.21.4 (26.x) ne sont pas dans la liste : le générateur n'est pas garanti pour elles.</p>
       </section>
+      <h2 class="section">Carte du monde</h2>
+      <section class="panel" id="seed-mapbox">${mapSection()}</section>
       <div id="seed-out" style="margin-top:14px">${seedOutputs()}</div>
 
       <h2 class="section">Mes graines</h2>
@@ -1027,12 +1179,12 @@
         <div class="chips">${TOOLS.map(([t, label]) => `<a class="chip chipbtn" href="${esc(SEED.chunkbaseUrl({ tool: t }))}" target="_blank" rel="noopener noreferrer">${esc(label)} ↗</a>`).join('')}</div>
         <p class="hint" style="margin:8px 0 0">Ces outils s'ouvrent sans réglages : copie ta graine ci-dessus, puis colle-la sur le site.</p>
       </section>
-      <p class="disclaimer">Chunkbase est un site indépendant : Grimoire n'est ni affilié à lui ni connecté par un accès officiel, il prépare seulement un lien. Le format du lien vient d'un exemple partagé et peut changer ; si la carte ne s'ouvre pas réglée, saisis la graine sur le site (bouton « Copier la graine »). Calculs de slimes : Java Edition, algorithme du wiki.</p>`;
+      <p class="disclaimer">Carte calculée par la bibliothèque open source cubiomes (licence MIT) compilée dans l'app, version Java uniquement. Les structures sont placées comme dans le jeu à partir de la graine ; un village ou un temple peut ne pas apparaître si le terrain exact l'en empêche (par exemple en pleine eau). Chunkbase est un site indépendant, non affilié à Grimoire.</p>`;
   }
 
   function refreshSeedOutputs() {
     const out = document.getElementById('seed-out');
-    if (out) { out.innerHTML = seedOutputs(); drawSlime(); }
+    if (out) out.innerHTML = seedOutputs();
   }
 
   function copyText(text, okMsg) {
@@ -1065,7 +1217,7 @@
       APP.innerHTML = c ? renderCategory(c) : renderEquipmentList();
     } else if (state.tab === 'seed') {
       APP.innerHTML = renderSeed();
-      drawSlime();
+      drawMap();
     } else if (state.tab === 'farms') {
       APP.innerHTML = renderFarms();
     } else if (state.tab === 'structures') {
@@ -1103,13 +1255,34 @@
     else if (a === 'back') { state.cat = null; state.sel = {}; state.result = null; }
     else if (a === 'struct-open') { state.struct.id = el.dataset.id; state.struct.q = ''; window.scrollTo({ top: 0 }); }
     else if (a === 'struct-back') { state.struct.id = null; window.scrollTo({ top: 0 }); }
-    else if (a === 'seed-embed') { state.seed.embed = !state.seed.embed; }
     else if (a === 'seed-copy-link') { copyText(seedUrl('seed-map'), 'Lien copié.'); return; }
     else if (a === 'seed-copy-seed') { const ps = SEED.parseSeed(state.seed.text); if (ps.seed !== null) copyText(ps.seed.toString(), 'Graine copiée.'); return; }
-    else if (a === 'slime-pan') {
-      if (el.dataset.reset) state.seed.pan = [0, 0];
-      else state.seed.pan = [state.seed.pan[0] + Number(el.dataset.dx), state.seed.pan[1] + Number(el.dataset.dz)];
-      refreshSeedOutputs(); return;
+    else if (a === 'map-zoom') {
+      const z = Number(el.dataset.z);
+      if (ZOOMS.some((q) => q[0] === z)) { state.seed.zoom = z; state.seed.picked = null; refreshSeedMap(); }
+      return;
+    }
+    else if (a === 'map-layer') {
+      const id = el.dataset.id, L = state.seed.layers;
+      if (id === 'biomes' || id === 'slime') L[id] = !L[id];
+      else if (mapStructList().some((q) => String(q.id) === id)) L.structs[id] = !L.structs[id];
+      refreshSeedMap(); return;
+    }
+    else if (a === 'map-pan') {
+      const sd = state.seed;
+      if (el.dataset.reset) sd.pan = [0, 0];
+      else sd.pan = [sd.pan[0] + Number(el.dataset.dx) * Math.round(viewBlocks() / 3), sd.pan[1] + Number(el.dataset.dz) * Math.round(viewBlocks() / 3)];
+      drawMap(); return;
+    }
+    else if (a === 'map-goto') {
+      const X = Number(el.dataset.x), Z = Number(el.dataset.z), [x0, z0] = seedXZ();
+      if (Number.isInteger(X) && Number.isInteger(Z) && x0 !== null && z0 !== null) { state.seed.pan = [X - x0, Z - z0]; drawMap(); }
+      return;
+    }
+    else if (a === 'map-copy') {
+      const t = `${Number(el.dataset.x)} ${Number(el.dataset.z)}`;
+      if (navigator.clipboard && navigator.clipboard.writeText) navigator.clipboard.writeText(t).then(() => { const i = document.getElementById('map-info'); if (i) i.insertAdjacentHTML('beforeend', '<div class="hint">Copié : ' + esc(t) + '</div>'); }).catch(() => {});
+      return;
     }
     else if (a === 'seed-save') {
       const e = sanitizeSeedEntry({ name: state.seed.name, text: state.seed.text, platform: state.seed.platform, dimension: state.seed.dimension, x: seedNum(state.seed.x) ?? 0, z: seedNum(state.seed.z) ?? 0 });
@@ -1205,13 +1378,15 @@
     } else if (e.target.id === 'sd-text' || e.target.id === 'sd-platform' || e.target.id === 'sd-dim' || e.target.id === 'sd-x' || e.target.id === 'sd-z') {
       const sd = state.seed;
       if (e.target.id === 'sd-text') sd.text = e.target.value;
-      else if (e.target.id === 'sd-platform') sd.platform = SEED.PLATFORMS.includes(e.target.value) ? e.target.value : sd.platform;
+      else if (e.target.id === 'sd-platform') sd.platform = WORLD.VERSIONS.some((v) => v.key === e.target.value) ? e.target.value : sd.platform;
       else if (e.target.id === 'sd-dim') sd.dimension = SEED.DIMENSIONS.includes(e.target.value) ? e.target.value : sd.dimension;
       else if (e.target.id === 'sd-x') sd.x = e.target.value;
       else sd.z = e.target.value;
       sd.pan = [0, 0]; sd.picked = null; sd.msg = '';
       saveSeedState();
       refreshSeedOutputs();
+      if (e.target.id === 'sd-platform' || e.target.id === 'sd-dim') refreshSeedMap();
+      else { const box = document.getElementById('seed-mapbox'); const had = !!document.getElementById('seed-cv'); const has = SEED.parseSeed(sd.text).kind !== 'empty' && seedXZ()[0] !== null && seedXZ()[1] !== null; if (had !== has) refreshSeedMap(); else if (box) scheduleMap(); }
     } else if (e.target.id === 'sd-name') { state.seed.name = e.target.value;
     } else if (e.target.id === 'farm-q') {
       state.farm.q = e.target.value;
@@ -1230,19 +1405,34 @@
 
   document.querySelectorAll('.tab').forEach((b) => b.addEventListener('click', () => setTab(b.dataset.tab)));
   APP.addEventListener('error', (e) => { if (e.target && e.target.classList && e.target.classList.contains('thumb')) e.target.style.display = 'none'; }, true);
-  APP.addEventListener('click', (e) => {
-    if (!e.target || e.target.id !== 'slime-cv') return;
-    const ps = SEED.parseSeed(state.seed.text);
-    if (ps.kind === 'empty') return;
-    const r = e.target.getBoundingClientRect();
-    const i = Math.min(SLIME_N - 1, Math.max(0, Math.floor(((e.clientX - r.left) / r.width) * SLIME_N)));
-    const j = Math.min(SLIME_N - 1, Math.max(0, Math.floor(((e.clientY - r.top) / r.height) * SLIME_N)));
-    const [ocx, ocz] = slimeOrigin();
-    const cx = ocx - (SLIME_N - 1) / 2 + i, cz = ocz - (SLIME_N - 1) / 2 + j;
-    state.seed.picked = { cx, cz, slime: SEED.isSlimeChunk(ps.seed, cx, cz) };
-    drawSlime();
-    const info = document.getElementById('slime-info');
-    if (info) info.innerHTML = slimeInfoText();
+  // Carte : toucher = lire un point, glisser = se déplacer
+  let drag = null;
+  APP.addEventListener('pointerdown', (e) => {
+    if (!e.target || e.target.id !== 'seed-cv') return;
+    drag = { x: e.clientX, y: e.clientY, moved: false, id: e.pointerId };
+    try { e.target.setPointerCapture(e.pointerId); } catch (err) { /* sans importance */ }
+  });
+  APP.addEventListener('pointermove', (e) => {
+    if (!drag || e.pointerId !== drag.id || !e.target || e.target.id !== 'seed-cv') return;
+    const dx = e.clientX - drag.x, dy = e.clientY - drag.y;
+    if (Math.abs(dx) + Math.abs(dy) > 8) drag.moved = true;
+    if (drag.moved) e.target.style.transform = `translate(${dx}px,${dy}px)`;
+  });
+  APP.addEventListener('pointercancel', () => { drag = null; const cv = document.getElementById('seed-cv'); if (cv) cv.style.transform = ''; });
+  APP.addEventListener('pointerup', (e) => {
+    if (!drag || e.pointerId !== drag.id) return;
+    const d = drag; drag = null;
+    const cv = document.getElementById('seed-cv');
+    if (!cv) return;
+    cv.style.transform = '';
+    const r = cv.getBoundingClientRect();
+    if (d.moved) {
+      const g = mapState.geom, sd = state.seed;
+      if (!g) return;
+      const bpp = g.size / r.width;
+      sd.pan = [sd.pan[0] - Math.round((e.clientX - d.x) * bpp), sd.pan[1] - Math.round((e.clientY - d.y) * bpp)];
+      drawMap();
+    } else pickAt(e.clientX - r.left, e.clientY - r.top, r.width);
   });
   const homeLink = document.getElementById('homeLink');
   if (homeLink) homeLink.addEventListener('click', (e) => { e.preventDefault(); setTab('home'); });
