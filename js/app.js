@@ -1241,14 +1241,20 @@
           return `<div class="biorow"><i class="sw" style="background:rgb(${c[0]},${c[1]},${c[2]})"></i>${biomeIconHtml(en)}<span>${esc(WORLD.BIOMES_FR[en] || en || 'Biome ' + id)}</span><b>${Math.round((n / total) * 100) || '<1'} %</b></div>`;
         }).join('');
       }
-      const fl = document.getElementById('map-found');
-      if (fl) {
-        const names = mapState.names;
-        const list = mapState.markers.map((m) => ({ ...m, d: Math.round(Math.hypot(m.x - g.cx, m.z - g.cz)) })).sort((a, b) => a.d - b.d).slice(0, 40);
-        fl.innerHTML = list.length ? list.map((m) => `<button class="maprow" data-action="map-goto" data-x="${m.x}" data-z="${m.z}">${mkHtml(m.id)}<b>${esc(m.id === 'spawn' ? "Point d'apparition (approx.)" : names.get(m.id) || '?')}</b><span>X ${m.x} · Z ${m.z}</span><small>${m.d} blocs</small></button>`).join('')
-          : '<p class="hint">Aucune structure cochée dans cette zone. Active une couche ci-dessus ou dézoome.</p>';
-      }
+      mapState.foundList = mapState.markers.map((m) => ({ ...m, d: Math.round(Math.hypot(m.x - g.cx, m.z - g.cz)) })).sort((a, b) => a.d - b.d).slice(0, 300);
+      renderFound();
     }).catch(() => {});
+  }
+
+  // Liste des structures de la zone : repliée sur les 3 plus proches, dépliable en entier
+  function renderFound() {
+    const fl = document.getElementById('map-found');
+    if (!fl) return;
+    const list = mapState.foundList || [], names = mapState.names, open = !!mapState.foundOpen;
+    if (!list.length) { fl.innerHTML = '<p class="hint">Aucune structure cochée dans cette zone. Active une couche ci-dessus ou dézoome.</p>'; return; }
+    const shown = open ? list : list.slice(0, 3);
+    fl.innerHTML = shown.map((m) => `<button class="maprow" data-action="map-goto" data-x="${m.x}" data-z="${m.z}">${mkHtml(m.id)}<b>${esc(m.id === 'spawn' ? "Point d'apparition (approx.)" : names.get(m.id) || '?')}</b><span>X ${m.x} · Z ${m.z}</span><small>${m.d} blocs</small></button>`).join('')
+      + (list.length > 3 ? `<button class="foundtoggle" data-action="found-toggle" aria-expanded="${open}"><span class="arrow">${open ? '▲' : '▼'}</span> ${open ? 'Réduire la liste' : `Tout afficher (${list.length})`}</button>` : '');
   }
 
   async function drawMap() {
@@ -1452,6 +1458,7 @@
       if (ZOOMS.some((q) => q[0] === z)) tweenK(2 / z, 220);
       return;
     }
+    else if (a === 'found-toggle') { mapState.foundOpen = !mapState.foundOpen; renderFound(); return; }
     else if (a === 'map-zstep') { zoomStep(Number(el.dataset.d)); return; }
     else if (a === 'map-layer') {
       const id = el.dataset.id, L = state.seed.layers;
