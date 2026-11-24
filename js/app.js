@@ -967,7 +967,7 @@
         <button class="btn ghost small" data-action="map-pan" data-dx="1" data-dz="0" aria-label="Droite">▶</button>
         <button class="btn ghost small" data-action="map-pan" data-reset="1">Recentrer</button>
       </div>
-      <div id="map-info" class="mapinfo hint">Touche la carte pour lire le biome et les coordonnées, fais-la glisser pour te déplacer. Croix dorée = tes coordonnées.</div>
+      <div id="map-info" class="mapinfo hint">Touche la carte pour lire le biome et les coordonnées, fais-la glisser avec un doigt pour te déplacer (zoom : boutons + et −). Croix dorée = tes coordonnées.</div>
       <div class="control-title">Couches</div>
       <div class="chips" role="group" aria-label="Couches">
         <button class="chip chipbtn ${L.biomes ? 'on' : ''}" data-action="map-layer" data-id="biomes" aria-pressed="${L.biomes}">Biomes</button>
@@ -1430,51 +1430,30 @@
 
   document.querySelectorAll('.tab').forEach((b) => b.addEventListener('click', () => setTab(b.dataset.tab)));
   APP.addEventListener('error', (e) => { if (e.target && e.target.classList && e.target.classList.contains('thumb')) e.target.style.display = 'none'; }, true);
-  // Carte : toucher = lire un point, glisser = se déplacer, pincer ou molette = zoomer
+  // Carte : toucher = lire un point, glisser avec un doigt = se déplacer.
+  // Seul le premier doigt compte : un deuxième doigt posé (pouce qui tient le téléphone) est ignoré.
   let drag = null;
-  const pts = new Map();
-  let pinch = null;
-  const resetCv = () => { const cv = document.getElementById('seed-cv'); if (cv) { cv.style.transform = ''; } };
+  const resetCv = () => { const cv = document.getElementById('seed-cv'); if (cv) cv.style.transform = ''; };
   APP.addEventListener('pointerdown', (e) => {
     if (!e.target || e.target.id !== 'seed-cv') return;
-    pts.set(e.pointerId, [e.clientX, e.clientY]);
+    if (drag && Date.now() - drag.t < 5000) return;          // un doigt est déjà en train de bouger la carte
+    drag = { x: e.clientX, y: e.clientY, moved: false, id: e.pointerId, t: Date.now() };
     try { e.target.setPointerCapture(e.pointerId); } catch (err) { /* sans importance */ }
-    if (pts.size === 2) {
-      const [a, b] = [...pts.values()];
-      pinch = { d0: Math.hypot(a[0] - b[0], a[1] - b[1]) || 1, ratio: 1 };
-      drag = null; resetCv();
-    } else if (pts.size === 1) drag = { x: e.clientX, y: e.clientY, moved: false, id: e.pointerId };
   });
   APP.addEventListener('pointermove', (e) => {
-    if (!pts.has(e.pointerId)) return;
-    pts.set(e.pointerId, [e.clientX, e.clientY]);
+    if (!drag || e.pointerId !== drag.id) return;
     const cv = document.getElementById('seed-cv');
     if (!cv) return;
-    if (pinch && pts.size === 2) {
-      const [a, b] = [...pts.values()];
-      pinch.ratio = (Math.hypot(a[0] - b[0], a[1] - b[1]) || 1) / pinch.d0;
-      cv.style.transform = `scale(${Math.min(3, Math.max(0.35, pinch.ratio))})`;
-      return;
-    }
-    if (!drag || e.pointerId !== drag.id) return;
     const dx = e.clientX - drag.x, dy = e.clientY - drag.y;
     if (Math.abs(dx) + Math.abs(dy) > 8) drag.moved = true;
     if (drag.moved) cv.style.transform = `translate(${dx}px,${dy}px)`;
   });
-  APP.addEventListener('pointercancel', (e) => { pts.delete(e.pointerId); drag = null; pinch = null; resetCv(); });
+  APP.addEventListener('pointercancel', (e) => { if (drag && e.pointerId === drag.id) { drag = null; resetCv(); } });
   APP.addEventListener('pointerup', (e) => {
-    if (!pts.has(e.pointerId)) return;
-    pts.delete(e.pointerId);
-    const cv = document.getElementById('seed-cv');
-    if (pinch) {
-      if (pts.size < 2) {
-        const r = pinch.ratio; pinch = null; drag = null; resetCv();
-        if (r > 1.3) zoomStep(-1); else if (r < 0.77) zoomStep(1);
-      }
-      return;
-    }
-    if (!drag || e.pointerId !== drag.id || !cv) return;
+    if (!drag || e.pointerId !== drag.id) return;
     const d = drag; drag = null;
+    const cv = document.getElementById('seed-cv');
+    if (!cv) return;
     cv.style.transform = '';
     const r = cv.getBoundingClientRect();
     if (d.moved) {
