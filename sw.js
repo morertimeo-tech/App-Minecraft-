@@ -1,6 +1,6 @@
 // Service worker : met toute l'app en cache pour l'usage hors-ligne.
 // Changer CACHE à chaque mise à jour pour forcer le rafraîchissement.
-const CACHE = 'grimoire-v24';
+const CACHE = 'grimoire-v25';
 const FILES = [
   './', './index.html', './manifest.webmanifest',
   './assets/armorstand.png',

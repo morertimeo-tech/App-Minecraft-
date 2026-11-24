@@ -986,7 +986,7 @@
       <div id="map-notes" class="hint" style="margin-top:6px"></div>
       <div class="control-title">Biomes dans la zone</div>
       <div id="map-biomes" class="mapbiomes"></div>
-      <div class="control-title">Structures dans la zone</div>
+      <div class="foundhead"><div class="control-title" style="margin:0">Structures dans la zone</div><button id="found-toggle" class="foundtoggle" data-action="found-toggle" aria-expanded="false" hidden></button></div>
       <div id="map-found"></div>`;
   }
 
@@ -1248,13 +1248,17 @@
 
   // Liste des structures de la zone : repliée sur les 3 plus proches, dépliable en entier
   function renderFound() {
-    const fl = document.getElementById('map-found');
+    const fl = document.getElementById('map-found'), tg = document.getElementById('found-toggle');
     if (!fl) return;
     const list = mapState.foundList || [], names = mapState.names, open = !!mapState.foundOpen;
+    if (tg) {                                          // bouton à côté du titre, collé en haut de l'écran pendant qu'on défile la liste
+      tg.hidden = list.length <= 3;
+      tg.setAttribute('aria-expanded', open);
+      tg.innerHTML = `<span class="arrow">${open ? '▲' : '▼'}</span> ${open ? 'Réduire' : `Tout (${list.length})`}`;
+    }
     if (!list.length) { fl.innerHTML = '<p class="hint">Aucune structure cochée dans cette zone. Active une couche ci-dessus ou dézoome.</p>'; return; }
     const shown = open ? list : list.slice(0, 3);
-    fl.innerHTML = shown.map((m) => `<button class="maprow" data-action="map-goto" data-x="${m.x}" data-z="${m.z}">${mkHtml(m.id)}<b>${esc(m.id === 'spawn' ? "Point d'apparition (approx.)" : names.get(m.id) || '?')}</b><span>X ${m.x} · Z ${m.z}</span><small>${m.d} blocs</small></button>`).join('')
-      + (list.length > 3 ? `<button class="foundtoggle" data-action="found-toggle" aria-expanded="${open}"><span class="arrow">${open ? '▲' : '▼'}</span> ${open ? 'Réduire la liste' : `Tout afficher (${list.length})`}</button>` : '');
+    fl.innerHTML = shown.map((m) => `<button class="maprow" data-action="map-goto" data-x="${m.x}" data-z="${m.z}">${mkHtml(m.id)}<b>${esc(m.id === 'spawn' ? "Point d'apparition (approx.)" : names.get(m.id) || '?')}</b><span>X ${m.x} · Z ${m.z}</span><small>${m.d} blocs</small></button>`).join('');
   }
 
   async function drawMap() {
@@ -1342,7 +1346,7 @@
       <p class="hint" style="margin:6px 2px 10px">Entre ta graine, ta version et ta dimension : l'app génère la carte <b>dans ton téléphone</b> (biomes, villages et autres structures, forteresses, point d'apparition, chunks à slimes), sans connexion une fois chargée.</p>
       <section class="panel">
         <label class="field">Graine (nombre ou texte)
-          <input id="sd-text" type="text" inputmode="text" placeholder="Ex. 123456789 ou mon monde" value="${esc(sd.text)}" autocomplete="off" autocapitalize="off" spellcheck="false" /></label>
+          <span class="seedrow"><input id="sd-text" type="text" inputmode="text" placeholder="Ex. 123456789" value="${esc(sd.text)}" autocomplete="off" autocapitalize="off" spellcheck="false" /><button type="button" class="btn small seeddice" data-action="seed-random" aria-label="Générer une graine aléatoire">🎲 Aléatoire</button></span></label>
         <label class="field">Version
           <select id="sd-platform">${WORLD.VERSIONS.map((v) => `<option value="${v.key}" ${v.key === sd.platform ? 'selected' : ''}>Java ${esc(v.label)}</option>`).join('')}</select></label>
         <label class="field">Dimension
@@ -1456,6 +1460,18 @@
     else if (a === 'map-zoom') {
       const z = Number(el.dataset.z);
       if (ZOOMS.some((q) => q[0] === z)) tweenK(2 / z, 220);
+      return;
+    }
+    else if (a === 'seed-random') {
+      const buf = new BigUint64Array(1);
+      (window.crypto || window.msCrypto).getRandomValues(buf);
+      const sd = state.seed;
+      sd.text = BigInt.asIntN(64, buf[0]).toString();
+      sd.x = ''; sd.z = '';                           // la carte se centre sur le spawn de la nouvelle graine
+      sd.pan = [0, 0]; sd.picked = null; sd.msg = '';
+      const t = document.getElementById('sd-text'), xi = document.getElementById('sd-x'), zi = document.getElementById('sd-z');
+      if (t) t.value = sd.text; if (xi) xi.value = ''; if (zi) zi.value = '';
+      saveSeedState(); refreshSeedOutputs(); refreshSeedMap();
       return;
     }
     else if (a === 'found-toggle') { mapState.foundOpen = !mapState.foundOpen; renderFound(); return; }
@@ -1663,6 +1679,9 @@
   }, { passive: false });
   const homeLink = document.getElementById('homeLink');
   if (homeLink) homeLink.addEventListener('click', (e) => { e.preventDefault(); setTab('home'); });
+
+  const setBarH = () => { const t = document.querySelector('.topbar'); if (t) document.documentElement.style.setProperty('--topbar-h', t.offsetHeight + 'px'); };
+  setBarH(); window.addEventListener('resize', setBarH);
 
   render();
 })();
