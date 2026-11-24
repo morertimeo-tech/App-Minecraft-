@@ -59,7 +59,7 @@
     trade: { prof: null, q: '' }, // onglet Échanges : profession ouverte, recherche
     struct: { id: null, q: '' },  // onglet Structures : structure ouverte, recherche
     homeQ: '',                    // accueil : recherche globale
-    seed: { text: '', platform: 'java_1_21', dimension: 'overworld', x: '0', z: '0', embed: false, name: '', saved: [], pan: [0, 0], picked: null, msg: '', importOpen: false, exportText: '', zoom: 16, layers: { biomes: true, slime: false, structs: { 5: true, stronghold: true, 18: true, 19: true, 20: true } } }, // onglet Graine
+    seed: { text: '', platform: 'java_1_21', dimension: 'overworld', x: '', z: '', embed: false, name: '', saved: [], pan: [0, 0], picked: null, msg: '', importOpen: false, exportText: '', zoom: 16, layers: { biomes: true, slime: false, structs: { 5: true, stronghold: true, 18: true, 19: true, 20: true } } }, // onglet Graine
     farm: { id: null, q: '', adding: false, playing: null, draft: { title: '', url: '', note: '' }, err: '', msg: '', importOpen: false, exportText: '' }, // onglet Fermes
     trim: trimState,
   };
@@ -851,8 +851,9 @@
       text,
       platform: WORLD.VERSIONS.some((v) => v.key === b.platform) ? b.platform : 'java_1_21',
       dimension: SEED.DIMENSIONS.includes(b.dimension) ? b.dimension : 'overworld',
-      x: Number.isInteger(x) && Math.abs(x) <= SEED.COORD_LIMIT ? x : 0,
-      z: Number.isInteger(z) && Math.abs(z) <= SEED.COORD_LIMIT ? z : 0,
+      // vide = carte centrée sur le point d'apparition (spawn)
+      x: b.x !== '' && b.x != null && Number.isInteger(x) && Math.abs(x) <= SEED.COORD_LIMIT ? x : '',
+      z: b.z !== '' && b.z != null && Number.isInteger(z) && Math.abs(z) <= SEED.COORD_LIMIT ? z : '',
     };
   }
   try {
@@ -871,10 +872,17 @@
 
   const seedNum = (v) => { const n = Number(String(v).trim()); return String(v).trim() !== '' && Number.isInteger(n) && Math.abs(n) <= SEED.COORD_LIMIT ? n : null; };
   const seedXZ = () => [seedNum(state.seed.x), seedNum(state.seed.z)];
+  // 'spawn' : aucune coordonnée saisie ; 'coords' : X et Z valides ; 'invalid' : saisie incomplète ou incorrecte
+  const coordMode = () => {
+    const sd = state.seed, empty = (v) => String(v).trim() === '';
+    if (empty(sd.x) && empty(sd.z)) return 'spawn';
+    const [x, z] = seedXZ();
+    return x !== null && z !== null ? 'coords' : 'invalid';
+  };
   function seedUrl(tool) {
     const ps = SEED.parseSeed(state.seed.text);
     const [x, z] = seedXZ();
-    return SEED.chunkbaseUrl({ tool, seed: ps.seed, platform: cbPlatform(state.seed.platform), dimension: state.seed.dimension, x, z });
+    return SEED.chunkbaseUrl({ tool, seed: ps.seed, platform: cbPlatform(state.seed.platform), dimension: state.seed.dimension, x: x === null ? undefined : x, z: z === null ? undefined : z });
   }
 
   function seedOutputs() {
@@ -953,9 +961,8 @@
   function mapSection() {
     const sd = state.seed;
     const ps = SEED.parseSeed(sd.text);
-    const [x, z] = seedXZ();
     if (ps.kind === 'empty') return '<p class="hint">Entre une graine pour afficher la carte.</p>';
-    if (x === null || z === null) return '<p class="hint">Entre des coordonnées valides (X et Z) pour centrer la carte.</p>';
+    if (coordMode() === 'invalid') return '<p class="hint">Entre des coordonnées valides (X et Z) pour centrer la carte.</p>';
     const L = sd.layers;
     return `
       <div class="chips" role="group" aria-label="Zoom">${ZOOMS.map(([s, name, w]) => `<button class="chip chipbtn ${sd.zoom === s ? 'on' : ''}" data-action="map-zoom" data-z="${s}" aria-pressed="${sd.zoom === s}">${name} <small>${w}</small></button>`).join('')}</div>
@@ -967,7 +974,7 @@
         <button class="btn ghost small" data-action="map-pan" data-dx="1" data-dz="0" aria-label="Droite">▶</button>
         <button class="btn ghost small" data-action="map-pan" data-reset="1">Recentrer</button>
       </div>
-      <div id="map-info" class="mapinfo hint">Touche la carte pour lire le biome et les coordonnées, fais-la glisser avec un doigt pour te déplacer (zoom : boutons + et −). Croix dorée = tes coordonnées.</div>
+      <div id="map-info" class="mapinfo hint">Touche la carte pour lire le biome et les coordonnées, fais-la glisser avec un doigt pour te déplacer (zoom : boutons + et −). La carte est centrée sur le point d'apparition (boussole) si tu ne saisis pas de coordonnées.</div>
       <div class="control-title">Couches</div>
       <div class="chips" role="group" aria-label="Couches">
         <button class="chip chipbtn ${L.biomes ? 'on' : ''}" data-action="map-layer" data-id="biomes" aria-pressed="${L.biomes}">Biomes</button>
@@ -985,8 +992,8 @@
   async function drawMap() {
     const cv = document.getElementById('seed-cv');
     if (!cv) return;
-    const sd = state.seed, ps = SEED.parseSeed(sd.text), [x0, z0] = seedXZ();
-    if (ps.kind === 'empty' || x0 === null || z0 === null) return;
+    const sd = state.seed, ps = SEED.parseSeed(sd.text), mode = coordMode();
+    if (ps.kind === 'empty' || mode === 'invalid') return;
     const token = ++mapState.token;
     const status = document.getElementById('map-status');
     const say = (m) => { if (status) { status.textContent = m; status.style.display = m ? 'block' : 'none'; } };
@@ -1001,6 +1008,11 @@
       const ver = WORLD.VERSIONS.find((v) => v.key === sd.platform) || WORLD.VERSIONS[0];
       const dim = DIM_ID[sd.dimension];
       w.init(ver.mc, ps.seed, dim, false);
+      // centre : coordonnées saisies, sinon le spawn (Overworld) ou 0 ; 0 dans les autres dimensions
+      const skey = ver.mc + '|' + ps.seed;
+      if (dim === 0 && (!mapState.spawn || mapState.spawn.key !== skey)) mapState.spawn = { key: skey, pos: w.spawn() };
+      const [x0, z0] = mode === 'coords' ? seedXZ() : dim === 0 ? mapState.spawn.pos : [0, 0];
+      mapState.base = [x0, z0];
       const S = sd.zoom, cx = x0 + sd.pan[0], cz = z0 + sd.pan[1];
       const bx0 = Math.floor(cx / S) - MAP_CELLS / 2, bz0 = Math.floor(cz / S) - MAP_CELLS / 2;
       const X0 = bx0 * S, Z0 = bz0 * S, X1 = X0 + MAP_CELLS * S - 1, Z1 = Z0 + MAP_CELLS * S - 1;
@@ -1038,10 +1050,6 @@
           }
         }
       }
-      // axes X = 0 / Z = 0
-      ctx.strokeStyle = 'rgba(255,255,255,.35)'; ctx.lineWidth = 1;
-      if (X0 <= 0 && X1 >= 0) { const [px] = toPx(0, 0); ctx.beginPath(); ctx.moveTo(px + .5, 0); ctx.lineTo(px + .5, MAP_SIZE); ctx.stroke(); }
-      if (Z0 <= 0 && Z1 >= 0) { const [, py] = toPx(0, 0); ctx.beginPath(); ctx.moveTo(0, py + .5); ctx.lineTo(MAP_SIZE, py + .5); ctx.stroke(); }
       // structures
       const markers = [];
       const names = new Map(WORLD.STRUCTURES.map((s) => [s.id, s.fr]));
@@ -1079,12 +1087,6 @@
         const img = imgs[m.id];
         if (img) { ctx.imageSmoothingEnabled = false; ctx.drawImage(img, px - 7, py - 7, 14, 14); }
         if (m.id === 'spawn') { ctx.beginPath(); ctx.arc(px, py, 11, 0, Math.PI * 2); ctx.lineWidth = 2; ctx.strokeStyle = '#fff'; ctx.stroke(); }
-      }
-      // ta position (croix dorée) au centre de la vue initiale
-      const [hx, hy] = toPx(x0, z0);
-      if (hx >= 0 && hx <= MAP_SIZE && hy >= 0 && hy <= MAP_SIZE) {
-        ctx.strokeStyle = '#000'; ctx.lineWidth = 4; ctx.beginPath(); ctx.moveTo(hx - 7, hy); ctx.lineTo(hx + 7, hy); ctx.moveTo(hx, hy - 7); ctx.lineTo(hx, hy + 7); ctx.stroke();
-        ctx.strokeStyle = '#ffb83d'; ctx.lineWidth = 2; ctx.stroke();
       }
       mapState.geom = { X0, Z0, S, cx, cz, size: MAP_CELLS * S };
       mapState.markers = markers; mapState.names = names;
@@ -1155,10 +1157,10 @@
     return list.length ? list.map((e) => `
       <div class="trade">
         <div class="loot-top"><strong>${esc(e.name)}</strong><span class="loot-qty">${esc(PLATFORM_LABEL(e.platform))} · ${esc(DIM_LABEL[e.dimension])}</span></div>
-        <div class="tname" style="font-family:ui-monospace,Menlo,monospace;font-size:12.5px;overflow-wrap:anywhere">${esc(e.text || '(sans graine)')} · X ${e.x} · Z ${e.z}</div>
+        <div class="tname" style="font-family:ui-monospace,Menlo,monospace;font-size:12.5px;overflow-wrap:anywhere">${esc(e.text || '(sans graine)')} · ${e.x === '' || e.z === '' ? 'centrée sur le spawn' : `X ${e.x} · Z ${e.z}`}</div>
         <div class="toolbar" style="margin-top:8px">
           <button class="btn small" data-action="seed-load" data-id="${esc(e.id)}">Charger</button>
-          <a class="btn ghost small" href="${esc(SEED.chunkbaseUrl({ tool: 'seed-map', seed: SEED.parseSeed(e.text).seed, platform: cbPlatform(e.platform), dimension: e.dimension, x: e.x, z: e.z }))}" target="_blank" rel="noopener noreferrer">Chunkbase ↗</a>
+          <a class="btn ghost small" href="${esc(SEED.chunkbaseUrl({ tool: 'seed-map', seed: SEED.parseSeed(e.text).seed, platform: cbPlatform(e.platform), dimension: e.dimension, x: e.x === '' ? undefined : e.x, z: e.z === '' ? undefined : e.z }))}" target="_blank" rel="noopener noreferrer">Chunkbase ↗</a>
           <button class="btn ghost small danger" data-action="seed-del" data-id="${esc(e.id)}">Supprimer</button>
         </div>
       </div>`).join('') : '<p class="hint">Aucune graine enregistrée.</p>';
@@ -1176,8 +1178,8 @@
         <label class="field">Dimension
           <select id="sd-dim">${SEED.DIMENSIONS.map((d) => `<option value="${d}" ${d === sd.dimension ? 'selected' : ''}>${esc(DIM_LABEL[d])}</option>`).join('')}</select></label>
         <div class="two">
-          <label class="field">X<input id="sd-x" type="number" inputmode="numeric" step="1" value="${esc(sd.x)}" /></label>
-          <label class="field">Z<input id="sd-z" type="number" inputmode="numeric" step="1" value="${esc(sd.z)}" /></label>
+          <label class="field">X<input id="sd-x" type="number" inputmode="numeric" step="1" placeholder="spawn" value="${esc(sd.x)}" /></label>
+          <label class="field">Z<input id="sd-z" type="number" inputmode="numeric" step="1" placeholder="spawn" value="${esc(sd.z)}" /></label>
         </div>
         <p class="hint" style="margin:10px 0 0">Les versions plus récentes que 1.21.4 (26.x) ne sont pas dans la liste : le générateur n'est pas garanti pour elles.</p>
       </section>
@@ -1300,8 +1302,8 @@
       drawMap(); return;
     }
     else if (a === 'map-goto') {
-      const X = Number(el.dataset.x), Z = Number(el.dataset.z), [x0, z0] = seedXZ();
-      if (Number.isInteger(X) && Number.isInteger(Z) && x0 !== null && z0 !== null) { state.seed.pan = [X - x0, Z - z0]; drawMap(); }
+      const X = Number(el.dataset.x), Z = Number(el.dataset.z), [x0, z0] = mapState.base || [0, 0];
+      if (Number.isInteger(X) && Number.isInteger(Z)) { state.seed.pan = [X - x0, Z - z0]; drawMap(); }
       return;
     }
     else if (a === 'map-copy') {
@@ -1310,7 +1312,7 @@
       return;
     }
     else if (a === 'seed-save') {
-      const e = sanitizeSeedEntry({ name: state.seed.name, text: state.seed.text, platform: state.seed.platform, dimension: state.seed.dimension, x: seedNum(state.seed.x) ?? 0, z: seedNum(state.seed.z) ?? 0 });
+      const e = sanitizeSeedEntry({ name: state.seed.name, text: state.seed.text, platform: state.seed.platform, dimension: state.seed.dimension, x: seedNum(state.seed.x) ?? '', z: seedNum(state.seed.z) ?? '' });
       if (state.seed.saved.length >= 50) state.seed.msg = 'Limite de 50 graines atteinte : supprime-en une.';
       else if (!e.text) state.seed.msg = 'Entre d\'abord une graine à enregistrer.';
       else { state.seed.saved.unshift(e); state.seed.name = ''; state.seed.msg = ''; saveSeedState(); }
@@ -1411,7 +1413,7 @@
       saveSeedState();
       refreshSeedOutputs();
       if (e.target.id === 'sd-platform' || e.target.id === 'sd-dim') refreshSeedMap();
-      else { const box = document.getElementById('seed-mapbox'); const had = !!document.getElementById('seed-cv'); const has = SEED.parseSeed(sd.text).kind !== 'empty' && seedXZ()[0] !== null && seedXZ()[1] !== null; if (had !== has) refreshSeedMap(); else if (box) scheduleMap(); }
+      else { const box = document.getElementById('seed-mapbox'); const had = !!document.getElementById('seed-cv'); const has = SEED.parseSeed(sd.text).kind !== 'empty' && coordMode() !== 'invalid'; if (had !== has) refreshSeedMap(); else if (box) scheduleMap(); }
     } else if (e.target.id === 'sd-name') { state.seed.name = e.target.value;
     } else if (e.target.id === 'farm-q') {
       state.farm.q = e.target.value;
