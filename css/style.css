@@ -445,3 +445,12 @@ a.chip { text-decoration: none; }
 .maprow span { color: var(--aqua); font-family: ui-monospace, Menlo, Consolas, monospace; font-size: 12.5px; }
 .maprow small { color: var(--muted); width: 100%; padding-left: 20px; }
 .maprow:hover { border-color: var(--gold); }
+.mk { display: inline-flex; align-items: center; justify-content: center; width: 20px; height: 20px; border-radius: 50%; border: 1.5px solid #000; margin-right: 6px; vertical-align: middle; flex: none; }
+.mk img, .bi { image-rendering: pixelated; width: 14px; height: 14px; }
+.bi { margin-right: 6px; flex: none; }
+.maprow .mk { margin-right: 4px; }
+.mapinfo .mk { width: 18px; height: 18px; }
+.mapzoom { position: absolute; top: 8px; right: 8px; display: flex; flex-direction: column; gap: 6px; line-height: 1; }
+.mapzoom button { width: 38px; height: 38px; border-radius: 10px; border: 2px solid #000; background: rgba(42,36,56,.92); color: var(--text); font: inherit; font-size: 22px; font-weight: 700; cursor: pointer; }
+.mapzoom button:disabled { opacity: .4; cursor: default; }
+.mapcv { transform-origin: center; }

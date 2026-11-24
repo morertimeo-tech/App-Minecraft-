@@ -52,5 +52,10 @@ const S = require('../js/seed.js');
   assert(world.structures(18, -2000, -2000, 2000, 2000).length > 0, 'forteresses du Nether');
   world.init(V('java_1_21'), 1n, 1, false);
   assert(world.structures(20, -3000, -3000, 3000, 3000).length > 0, "cités de l'End");
+  // 7. Icônes : chaque structure et chaque biome (sauf le vide) a une icône présente sur le disque
+  const ic = JSON.parse(fs.readFileSync(path.join(__dirname, '../js/map-icons.js'), 'utf8').replace(/^[^{]*=\s*/, '').replace(/;\s*$/, ''));
+  const have = (f) => fs.existsSync(path.join(__dirname, '../assets/map-icons', f + '.png'));
+  for (const st of [...W.STRUCTURES, W.STRONGHOLD, { id: 'spawn' }]) assert(ic.structures[st.id] && have(ic.structures[st.id]), 'icône de structure ' + st.id);
+  for (const n of Object.keys(W.BIOMES_FR)) if (n !== 'the_void') assert(ic.biomes[n] && have(ic.biomes[n]), 'icône de biome ' + n);
   console.log('OK : générateur de monde (' + v1.length + ' villages recoupés, biomes 4 versions, spawn, forteresses)');
 })().catch((e) => { console.error(e); process.exit(1); });

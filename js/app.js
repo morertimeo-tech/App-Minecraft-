@@ -919,9 +919,20 @@
 
   // ---------- Carte du monde (biomes + structures) ----------
   const DIM_ID = { overworld: 0, nether: -1, end: 1 };
-  const ZOOMS = [[4, 'Détail', '≈ 640 blocs'], [16, 'Moyen', '≈ 2 500 blocs'], [64, 'Large', '≈ 10 000 blocs'], [256, 'Très large', '≈ 41 000 blocs']];
+  const ZOOMS = [[1, 'Bloc', '≈ 160 blocs'], [4, 'Détail', '≈ 640 blocs'], [16, 'Moyen', '≈ 2 500 blocs'], [64, 'Large', '≈ 10 000 blocs'], [256, 'Très large', '≈ 41 000 blocs']];
   const MAP_CELLS = 160, MAP_PX = 2, MAP_SIZE = MAP_CELLS * MAP_PX;
   const STRUCT_COLORS = { 5: '#ffd34d', 10: '#ff5555', 9: '#b07a3c', 8: '#55ffff', 13: '#4a8fe0', 24: '#ffaa00', 1: '#e6d28a', 2: '#3fbf3f', 3: '#b46be0', 4: '#ffffff', 6: '#6ab0de', 7: '#c58b4a', 14: '#ffdd55', 15: '#c0c0c0', 11: '#a020f0', 16: '#5599ff', 23: '#d9a066', 18: '#d63a2a', 19: '#f5c542', 12: '#a020f0', 20: '#ff55ff', stronghold: '#00e5a0' };
+  const ICONS = window.MC_MAP_ICONS || { structures: {}, biomes: {} };
+  const iconUrl = (kind, key) => { const f = (ICONS[kind] || {})[key]; return f ? 'assets/map-icons/' + f + '.png' : ''; };
+  const imgCache = {};
+  function loadIcon(url) {
+    if (!url) return Promise.resolve(null);
+    if (!imgCache[url]) imgCache[url] = new Promise((res) => { const i = new Image(); i.onload = () => res(i); i.onerror = () => res(null); i.src = url; });
+    return imgCache[url];
+  }
+  const markerColor = (id) => (id === 'spawn' ? '#ffffff' : STRUCT_COLORS[id] || '#ffffff');
+  const mkHtml = (id) => { const u = iconUrl('structures', id); return `<span class="mk" style="background:${markerColor(id)}">${u ? `<img src="${u}" alt="" width="16" height="16" />` : ''}</span>`; };
+  const biomeIconHtml = (en) => { const u = iconUrl('biomes', en); return u ? `<img class="bi" src="${u}" alt="" width="16" height="16" />` : ''; };
   const mapState = { token: 0, geom: null, markers: [], note: '' };
   let worldP = null;
   function worldEngine() {
@@ -948,7 +959,7 @@
     const L = sd.layers;
     return `
       <div class="chips" role="group" aria-label="Zoom">${ZOOMS.map(([s, name, w]) => `<button class="chip chipbtn ${sd.zoom === s ? 'on' : ''}" data-action="map-zoom" data-z="${s}" aria-pressed="${sd.zoom === s}">${name} <small>${w}</small></button>`).join('')}</div>
-      <div class="mapwrap"><canvas id="seed-cv" class="mapcv" width="${MAP_SIZE}" height="${MAP_SIZE}" aria-label="Carte du monde"></canvas><div id="map-status" class="mapstatus">Chargement du moteur de carte…</div></div>
+      <div class="mapwrap"><canvas id="seed-cv" class="mapcv" width="${MAP_SIZE}" height="${MAP_SIZE}" aria-label="Carte du monde"></canvas><div class="mapzoom"><button data-action="map-zstep" data-d="-1" aria-label="Zoomer" ${sd.zoom === ZOOMS[0][0] ? 'disabled' : ''}>+</button><button data-action="map-zstep" data-d="1" aria-label="Dézoomer" ${sd.zoom === ZOOMS[ZOOMS.length - 1][0] ? 'disabled' : ''}>−</button></div><div id="map-status" class="mapstatus">Chargement du moteur de carte…</div></div>
       <div class="toolbar" style="margin-top:8px">
         <button class="btn ghost small" data-action="map-pan" data-dx="-1" data-dz="0" aria-label="Gauche">◀</button>
         <button class="btn ghost small" data-action="map-pan" data-dx="0" data-dz="-1" aria-label="Haut">▲</button>
@@ -963,7 +974,7 @@
         ${DIM_ID[sd.dimension] === 0 ? `<button class="chip chipbtn ${L.slime ? 'on' : ''}" data-action="map-layer" data-id="slime" aria-pressed="${L.slime}">Chunks à slimes</button>` : ''}
       </div>
       <div class="control-title">Structures</div>
-      <div class="chips" role="group" aria-label="Structures">${mapStructList().map((s) => `<button class="chip chipbtn ${L.structs[s.id] ? 'on' : ''}" data-sid="${s.id}" data-action="map-layer" data-id="${s.id}" aria-pressed="${!!L.structs[s.id]}"><i class="sw" style="background:${STRUCT_COLORS[s.id] || '#fff'}"></i>${esc(s.fr)}</button>`).join('')}</div>
+      <div class="chips" role="group" aria-label="Structures">${mapStructList().map((s) => `<button class="chip chipbtn ${L.structs[s.id] ? 'on' : ''}" data-sid="${s.id}" data-action="map-layer" data-id="${s.id}" aria-pressed="${!!L.structs[s.id]}">${mkHtml(s.id)}${esc(s.fr)}</button>`).join('')}</div>
       <div id="map-notes" class="hint" style="margin-top:6px"></div>
       <div class="control-title">Biomes dans la zone</div>
       <div id="map-biomes" class="mapbiomes"></div>
@@ -993,7 +1004,7 @@
       const S = sd.zoom, cx = x0 + sd.pan[0], cz = z0 + sd.pan[1];
       const bx0 = Math.floor(cx / S) - MAP_CELLS / 2, bz0 = Math.floor(cz / S) - MAP_CELLS / 2;
       const X0 = bx0 * S, Z0 = bz0 * S, X1 = X0 + MAP_CELLS * S - 1, Z1 = Z0 + MAP_CELLS * S - 1;
-      const ids = w.biomes(S, bx0, bz0, MAP_CELLS, MAP_CELLS, dim === 0 ? 64 : 15);   // y = 256 en Overworld : biomes de surface, pas les grottes
+      const ids = w.biomes(S, bx0, bz0, MAP_CELLS, MAP_CELLS, dim === 0 ? (S === 1 ? 256 : 64) : (S === 1 ? 60 : 15));   // y = 256 en Overworld : biomes de surface, pas les grottes
       if (!ids) throw new Error('biomes indisponibles');
       const ctx = cv.getContext('2d');
       ctx.imageSmoothingEnabled = false;
@@ -1057,12 +1068,17 @@
         const [X, Z] = mapState.spawn.pos;
         if (X >= X0 && X <= X1 && Z >= Z0 && Z <= Z1) markers.push({ id: 'spawn', x: X, z: Z });
       }
+      const imgs = {};
+      await Promise.all([...new Set(markers.map((m) => m.id))].map(async (id) => { imgs[id] = await loadIcon(iconUrl('structures', id)); }));
+      if (token !== mapState.token) return;
       for (const m of markers) {
         const [px, py] = toPx(m.x, m.z);
-        ctx.beginPath(); ctx.arc(px, py, m.id === 'spawn' ? 6 : 5, 0, Math.PI * 2);
-        ctx.fillStyle = m.id === 'spawn' ? '#ffffff' : (STRUCT_COLORS[m.id] || '#fff'); ctx.fill();
+        ctx.beginPath(); ctx.arc(px, py, 9, 0, Math.PI * 2);
+        ctx.fillStyle = markerColor(m.id); ctx.fill();
         ctx.lineWidth = 2; ctx.strokeStyle = '#000'; ctx.stroke();
-        if (m.id === 'spawn') { ctx.beginPath(); ctx.arc(px, py, 2, 0, Math.PI * 2); ctx.fillStyle = '#d33'; ctx.fill(); }
+        const img = imgs[m.id];
+        if (img) { ctx.imageSmoothingEnabled = false; ctx.drawImage(img, px - 7, py - 7, 14, 14); }
+        if (m.id === 'spawn') { ctx.beginPath(); ctx.arc(px, py, 11, 0, Math.PI * 2); ctx.lineWidth = 2; ctx.strokeStyle = '#fff'; ctx.stroke(); }
       }
       // ta position (croix dorée) au centre de la vue initiale
       const [hx, hy] = toPx(x0, z0);
@@ -1082,14 +1098,14 @@
         const rows = Object.keys(counts).map((id) => [Number(id), counts[id]]).sort((a, b) => b[1] - a[1]).slice(0, 12);
         bl.innerHTML = rows.map(([id, n]) => {
           const en = w.biomeName(id); const c = colors[id] || w.biomeColor(id);
-          return `<div class="biorow"><i class="sw" style="background:rgb(${c[0]},${c[1]},${c[2]})"></i><span>${esc(WORLD.BIOMES_FR[en] || en || 'Biome ' + id)}</span><b>${Math.round((n / total) * 100) || '<1'} %</b></div>`;
+          return `<div class="biorow"><i class="sw" style="background:rgb(${c[0]},${c[1]},${c[2]})"></i>${biomeIconHtml(en)}<span>${esc(WORLD.BIOMES_FR[en] || en || 'Biome ' + id)}</span><b>${Math.round((n / total) * 100) || '<1'} %</b></div>`;
         }).join('');
       }
       // liste des structures
       const fl = document.getElementById('map-found');
       if (fl) {
         const list = markers.filter((m) => m.id !== 'spawn' || true).map((m) => ({ ...m, d: Math.round(Math.hypot(m.x - cx, m.z - cz)) })).sort((a, b) => a.d - b.d).slice(0, 40);
-        fl.innerHTML = list.length ? list.map((m) => `<button class="maprow" data-action="map-goto" data-x="${m.x}" data-z="${m.z}"><i class="sw" style="background:${m.id === 'spawn' ? '#fff' : STRUCT_COLORS[m.id] || '#fff'}"></i><b>${esc(m.id === 'spawn' ? "Point d'apparition (approx.)" : names.get(m.id) || '?')}</b><span>X ${m.x} · Z ${m.z}</span><small>${m.d} blocs</small></button>`).join('')
+        fl.innerHTML = list.length ? list.map((m) => `<button class="maprow" data-action="map-goto" data-x="${m.x}" data-z="${m.z}">${mkHtml(m.id)}<b>${esc(m.id === 'spawn' ? "Point d'apparition (approx.)" : names.get(m.id) || '?')}</b><span>X ${m.x} · Z ${m.z}</span><small>${m.d} blocs</small></button>`).join('')
           : '<p class="hint">Aucune structure cochée dans cette zone. Active une couche ci-dessus ou dézoome.</p>';
       }
     } catch (e) {
@@ -1113,10 +1129,18 @@
       if (!info) return;
       const at = best ? best : { x: X, z: Z };
       info.classList.remove('hint');
-      info.innerHTML = `${best ? `<b>${esc(best.id === 'spawn' ? "Point d'apparition (approx.)" : mapState.names.get(best.id) || '?')}</b> — X ${best.x} · Z ${best.z}<br>` : ''}Biome : <b>${esc(WORLD.BIOMES_FR[en] || en || 'inconnu')}</b> · X ${X} · Z ${Z} · chunk ${SEED.blockToChunk(X)} ; ${SEED.blockToChunk(Z)}
+      info.innerHTML = `${best ? `${mkHtml(best.id)} <b>${esc(best.id === 'spawn' ? "Point d'apparition (approx.)" : mapState.names.get(best.id) || '?')}</b> — X ${best.x} · Z ${best.z}<br>` : ''}Biome : ${biomeIconHtml(en)} <b>${esc(WORLD.BIOMES_FR[en] || en || 'inconnu')}</b> · X ${X} · Z ${Z} · chunk ${SEED.blockToChunk(X)} ; ${SEED.blockToChunk(Z)}
         <div class="toolbar" style="margin-top:6px"><button class="btn ghost small" data-action="map-goto" data-x="${at.x}" data-z="${at.z}">Centrer ici</button>
         <button class="btn ghost small" data-action="map-copy" data-x="${at.x}" data-z="${at.z}">Copier X Z</button></div>`;
     }).catch(() => {});
+  }
+
+  function zoomStep(d) {
+    const i = ZOOMS.findIndex((q) => q[0] === state.seed.zoom);
+    const j = Math.min(ZOOMS.length - 1, Math.max(0, i + (d < 0 ? -1 : 1)));
+    if (i < 0 || j === i) return;
+    state.seed.zoom = ZOOMS[j][0]; state.seed.picked = null;
+    refreshSeedMap();
   }
 
   function refreshSeedMap() {
@@ -1262,6 +1286,7 @@
       if (ZOOMS.some((q) => q[0] === z)) { state.seed.zoom = z; state.seed.picked = null; refreshSeedMap(); }
       return;
     }
+    else if (a === 'map-zstep') { zoomStep(Number(el.dataset.d)); return; }
     else if (a === 'map-layer') {
       const id = el.dataset.id, L = state.seed.layers;
       if (id === 'biomes' || id === 'slime') L[id] = !L[id];
@@ -1405,25 +1430,51 @@
 
   document.querySelectorAll('.tab').forEach((b) => b.addEventListener('click', () => setTab(b.dataset.tab)));
   APP.addEventListener('error', (e) => { if (e.target && e.target.classList && e.target.classList.contains('thumb')) e.target.style.display = 'none'; }, true);
-  // Carte : toucher = lire un point, glisser = se déplacer
+  // Carte : toucher = lire un point, glisser = se déplacer, pincer ou molette = zoomer
   let drag = null;
+  const pts = new Map();
+  let pinch = null;
+  const resetCv = () => { const cv = document.getElementById('seed-cv'); if (cv) { cv.style.transform = ''; } };
   APP.addEventListener('pointerdown', (e) => {
     if (!e.target || e.target.id !== 'seed-cv') return;
-    drag = { x: e.clientX, y: e.clientY, moved: false, id: e.pointerId };
+    pts.set(e.pointerId, [e.clientX, e.clientY]);
     try { e.target.setPointerCapture(e.pointerId); } catch (err) { /* sans importance */ }
+    if (pts.size === 2) {
+      const [a, b] = [...pts.values()];
+      pinch = { d0: Math.hypot(a[0] - b[0], a[1] - b[1]) || 1, ratio: 1 };
+      drag = null; resetCv();
+    } else if (pts.size === 1) drag = { x: e.clientX, y: e.clientY, moved: false, id: e.pointerId };
   });
   APP.addEventListener('pointermove', (e) => {
-    if (!drag || e.pointerId !== drag.id || !e.target || e.target.id !== 'seed-cv') return;
-    const dx = e.clientX - drag.x, dy = e.clientY - drag.y;
-    if (Math.abs(dx) + Math.abs(dy) > 8) drag.moved = true;
-    if (drag.moved) e.target.style.transform = `translate(${dx}px,${dy}px)`;
-  });
-  APP.addEventListener('pointercancel', () => { drag = null; const cv = document.getElementById('seed-cv'); if (cv) cv.style.transform = ''; });
-  APP.addEventListener('pointerup', (e) => {
-    if (!drag || e.pointerId !== drag.id) return;
-    const d = drag; drag = null;
+    if (!pts.has(e.pointerId)) return;
+    pts.set(e.pointerId, [e.clientX, e.clientY]);
     const cv = document.getElementById('seed-cv');
     if (!cv) return;
+    if (pinch && pts.size === 2) {
+      const [a, b] = [...pts.values()];
+      pinch.ratio = (Math.hypot(a[0] - b[0], a[1] - b[1]) || 1) / pinch.d0;
+      cv.style.transform = `scale(${Math.min(3, Math.max(0.35, pinch.ratio))})`;
+      return;
+    }
+    if (!drag || e.pointerId !== drag.id) return;
+    const dx = e.clientX - drag.x, dy = e.clientY - drag.y;
+    if (Math.abs(dx) + Math.abs(dy) > 8) drag.moved = true;
+    if (drag.moved) cv.style.transform = `translate(${dx}px,${dy}px)`;
+  });
+  APP.addEventListener('pointercancel', (e) => { pts.delete(e.pointerId); drag = null; pinch = null; resetCv(); });
+  APP.addEventListener('pointerup', (e) => {
+    if (!pts.has(e.pointerId)) return;
+    pts.delete(e.pointerId);
+    const cv = document.getElementById('seed-cv');
+    if (pinch) {
+      if (pts.size < 2) {
+        const r = pinch.ratio; pinch = null; drag = null; resetCv();
+        if (r > 1.3) zoomStep(-1); else if (r < 0.77) zoomStep(1);
+      }
+      return;
+    }
+    if (!drag || e.pointerId !== drag.id || !cv) return;
+    const d = drag; drag = null;
     cv.style.transform = '';
     const r = cv.getBoundingClientRect();
     if (d.moved) {
@@ -1434,6 +1485,14 @@
       drawMap();
     } else pickAt(e.clientX - r.left, e.clientY - r.top, r.width);
   });
+  let wheelAt = 0;
+  APP.addEventListener('wheel', (e) => {
+    if (!e.target || e.target.id !== 'seed-cv') return;
+    e.preventDefault();
+    const now = Date.now();
+    if (now - wheelAt < 250) return;
+    wheelAt = now; zoomStep(e.deltaY < 0 ? -1 : 1);
+  }, { passive: false });
   const homeLink = document.getElementById('homeLink');
   if (homeLink) homeLink.addEventListener('click', (e) => { e.preventDefault(); setTab('home'); });
 
